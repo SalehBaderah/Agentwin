@@ -1953,6 +1953,38 @@ label small {
   margin: 10px 0;
 }
 
+.twin-canvas {
+  display: grid;
+  align-content: start;
+  gap: 16px;
+  min-height: 360px;
+  padding: 18px;
+  overflow: auto;
+  background: radial-gradient(circle at 20% 20%, rgba(78, 42, 79, .3), transparent 42%), #171119;
+}
+
+.twin-group h4 { margin: 0 0 8px; color: #cbb9d0; font-size: 11px; }
+.twin-group > div { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
+.twin-card-button { padding: 0; text-align: left; border: 0; background: transparent; }
+.twin-card-button .twin-node { width: 100%; min-height: 112px; }
+.project-overview, .readings-view, .controls-view { display: grid; gap: 18px; }
+.overview-split { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.metric-chart { height: 300px; padding: 12px; border: 1px solid var(--border); background: #1b151f; }
+.agent-mini { display: grid; gap: 12px; }
+.agent-mini > div:first-child { display: flex; align-items: center; gap: 9px; }
+.agent-mini h3, .agent-mini p { margin: 0; }
+.agent-question { display: flex; gap: 8px; }
+.agent-question input { min-width: 0; flex: 1; }
+.onboarding { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; max-width: 820px; }
+.onboarding label { display: grid; gap: 6px; color: var(--secondary); font-size: 12px; }
+.onboarding .primary, .onboarding [role="status"] { grid-column: 1 / -1; width: fit-content; }
+.onboarding fieldset { grid-column: 1 / -1; border: 1px solid var(--border); border-radius: 12px; padding: 14px; }
+.onboarding legend { padding: 0 6px; color: var(--text); font-weight: 700; }
+.onboarding fieldset > p { margin-top: 0; }
+.extra-device { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 10px; align-items: end; margin: 12px 0; }
+@media (max-width: 760px) { .overview-split, .onboarding { grid-template-columns: 1fr; } .onboarding .primary, .onboarding [role="status"] { grid-column: auto; } }
+@media (max-width: 720px) { .extra-device { grid-template-columns: 1fr; } }
+
 .detail-chart {
   height: 82px;
 }

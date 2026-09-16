@@ -1,8 +1,10 @@
 # Agentwin LED system report
 
+> Historical LED showcase report. Agentwin has since been restored as a multi-project platform; see [platform migration](platform-migration.md) for the current architecture. The LED command verification described below remains the showcase contract.
+
 ## Purpose and scope
 
-Agentwin is currently a single, live-hardware project for one external LED on an Arduino UNO R4 WiFi. It does not generate simulated readings, offer replay sessions, or create projects from the UI/API.
+At the time of this report, Agentwin was a single, live-hardware project for one external LED on an Arduino UNO R4 WiFi. The current platform adds persistent project onboarding and isolated live and simulated sessions; the saved LED identity below remains the hardware showcase configuration.
 
 The only project identity is:
 

@@ -2,6 +2,8 @@
 
 **Every system. Its own agent.** A local IoT monitoring MVP with an Obsidian Plum React interface, persistent FastAPI backend, project-scoped agent tools, simulation, replay, MQTT ingestion, and a USB gateway.
 
+> For the current multi-project workflow, use the [operator guide](docs/operator-guide.md). It supersedes older single-LED UI descriptions in this README.
+
 The first physical acceptance path controls an external LED on UNO R4 pin D7 through the live USB gateway and confirms the result through device telemetry. Simulation remains available as an explicitly selected test source. No physical test is claimed until the wiring procedure is performed.
 
 ## Run locally (Windows primary path)

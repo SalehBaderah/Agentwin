@@ -29,6 +29,7 @@ export type Component = {
   group?: string | null;
   bindings: string[];
   capabilities: string[];
+  controls?: { action: string; label: string; parameters: Record<string, unknown>; expected: { field: string }; timeout_seconds?: number }[];
   configuration: Record<string, unknown>;
   visual: Record<string, unknown>;
 };
@@ -42,6 +43,7 @@ export type Metric = {
   freshness_seconds: number | null;
   calibrated: boolean;
   source: string;
+  device_id?: string | null;
 };
 export type Project = {
   id: string;
@@ -53,10 +55,11 @@ export type Project = {
   connector: string;
   freshness_seconds: number;
   interval_seconds: number;
-  high_limit: number;
-  attenuator_inserted: boolean;
+  high_limit: number | null;
+  attenuator_inserted?: boolean;
   cable_description: string;
   mapping: { field: string; unit: string };
+  devices: { id: string; connector: string; serial_port?: string | null }[];
   graph: {
     schema_version: number;
     primary_field: string;
@@ -71,7 +74,7 @@ export type Session = {
   mode: string;
   created: number;
   scenario: string;
-  provenance: { origin: string; recording_id?: string };
+  provenance: { origin: string };
 };
 export type State = {
   project: Project;
@@ -81,6 +84,7 @@ export type State = {
   readings: Reading[];
   events: Event[];
   actions: { id: string; created: number; action: string; target: string; status: string }[];
+  devices: { id: string; connector: string; online: boolean; reporting: boolean }[];
   status: string;
   gateway_status: string;
 };
@@ -133,7 +137,7 @@ export async function api<T>(
 }
 export const time = (value: number | null | undefined) =>
   value
-    ? new Date(value * 1000).toLocaleTimeString([], {
+    ? new Date(value * 1000).toLocaleTimeString("en-US", {
         hour: "2-digit",
         minute: "2-digit",
         second: "2-digit",
@@ -143,5 +147,5 @@ export const display = (value: unknown) =>
   value === null || value === undefined
     ? "—"
     : typeof value === "number"
-      ? Number(value.toFixed(4)).toLocaleString()
+      ? Number(value.toFixed(4)).toLocaleString("en-US")
       : String(value);

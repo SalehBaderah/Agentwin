@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   BrowserRouter,
@@ -6,6 +6,7 @@ import {
   Link,
   Route,
   Routes,
+  useNavigate,
   useParams,
 } from "react-router-dom";
 import {
@@ -26,12 +27,14 @@ import {
   Radio,
   Router,
   Server,
+  Plus,
+  MessageSquare,
+  Send,
   Settings as SettingsIcon,
   ShieldCheck,
   Zap,
   X,
 } from "lucide-react";
-import { ReactFlow, Background, Controls, MarkerType } from "@xyflow/react";
 import {
   ResponsiveContainer,
   LineChart,
@@ -40,9 +43,8 @@ import {
   YAxis,
   Tooltip,
 } from "recharts";
-import type { Component, Event as ProjectEvent, Project, State } from "./types";
+import type { Answer, Component, Event as ProjectEvent, Project, State } from "./types";
 import { api, display, strings, time } from "./types";
-import "@xyflow/react/dist/style.css";
 import "@fontsource-variable/dm-sans";
 import "@fontsource-variable/manrope";
 import "./styles.css";
@@ -202,6 +204,7 @@ function App() {
               path="/projects/:id"
               element={<Workspace connected={connected} />}
             />
+            <Route path="/projects/new" element={<AddProject />} />
             <Route path="/events" element={<GlobalEvents states={states} />} />
             <Route path="/settings" element={<GlobalSettings />} />
             <Route
@@ -239,6 +242,7 @@ function Overview({
             Current state, recent evidence, and anything that needs attention.
           </p>
         </div>
+        <Link className="button primary" to="/projects/new"><Plus size={16}/> Add project</Link>
       </div>
       {!projectOnly && (
         <>
@@ -291,7 +295,7 @@ function Overview({
           Your projects <span>{states.length}</span>
         </h2>
         <span className="secondary">
-          Live hardware sessions by default
+          Independent live and test sessions
         </span>
       </div>
       <div className="project-grid">
@@ -339,7 +343,7 @@ function Overview({
             </div>
             <div className="card-footer">
               <span>
-                {s.session.mode === "live" ? <Cable size={13} /> : <FlaskConical size={13} />} {s.session.mode} · 1 device
+                {s.session.mode === "live" ? <Cable size={13} /> : <FlaskConical size={13} />} {s.devices.filter((device) => device.reporting).length}/{s.devices.length} reporting
               </span>
               <span>
                 {time(s.latest?.received)} <ArrowUpRight size={16} />
@@ -427,18 +431,19 @@ function Workspace({ connected }: { connected: boolean }) {
   const { id } = useParams();
   const [state, setState] = useState<State | null>(null),
     [error, setError] = useState(""),
+    [sid, setSid] = useState(""),
     [selectedComponentId, setSelectedComponentId] = useState<string | null>(null);
   const [tab, setTab] = useState(
     new URLSearchParams(location.search).get("tab") || "twin",
   );
   const refresh = useCallback(() => {
-    api<State>("/projects/" + id)
+    api<State>("/projects/" + id + (sid ? "?session=" + sid : ""))
       .then((s) => {
         setState(s);
         setError("");
       })
       .catch((e) => setError(e.message));
-  }, [id]);
+  }, [id, sid]);
   useEffect(() => {
     setState(null);
     setSelectedComponentId(null);
@@ -450,7 +455,7 @@ function Workspace({ connected }: { connected: boolean }) {
     let stopped = false;
     const connect = () => {
       socket = new WebSocket(
-        `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/api/ws?project=${id}`,
+        `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/api/ws?project=${id}${sid ? `&session=${sid}` : ""}`,
       );
       socket.onopen = refresh;
       socket.onmessage = (e) => {
@@ -471,7 +476,7 @@ function Workspace({ connected }: { connected: boolean }) {
       clearTimeout(timer);
       socket?.close();
     };
-  }, [refresh, id]);
+  }, [refresh, id, sid]);
   if (!state)
     return (
       <main className="page">
@@ -486,7 +491,7 @@ function Workspace({ connected }: { connected: boolean }) {
       </Link>
       <div className="page-heading">
         <div>
-          <div className="eyebrow">Physical LED project</div>
+          <div className="eyebrow">{p.template.replaceAll("_", " ")} project</div>
           <h1>{p.name}</h1>
           {p.arabic_title && (
             <p className="project-arabic" dir="rtl" lang="ar">
@@ -494,7 +499,7 @@ function Workspace({ connected }: { connected: boolean }) {
             </p>
           )}
         </div>
-        <Badge tone="success">Live hardware only</Badge>
+        <label className="source-picker">Session<select value={state.session.id} onChange={(event) => setSid(event.target.value)}>{state.sessions.map((session) => <option key={session.id} value={session.id}>{session.mode} · {time(session.created)}</option>)}</select></label>
       </div>
       <div className="status-line">
         <Badge tone="success">live</Badge>
@@ -505,11 +510,9 @@ function Workspace({ connected }: { connected: boolean }) {
         >
           {connected ? state.status : "Backend disconnected · snapshot only"}
         </Badge>
-        <span>{p.device_id}</span>
+        <span>{p.devices.map((device) => device.id).join(", ")}</span>
         <span>Freshness: {p.freshness_seconds}s</span>
-        {state.session.mode === "live" && p.connector === "usb" && (
-          <span>USB gateway: {state.gateway_status}</span>
-        )}
+        <span>Connector status: {state.gateway_status}</span>
       </div>
       {error && (
         <div className="error" role="alert">
@@ -532,7 +535,7 @@ function Workspace({ connected }: { connected: boolean }) {
           }
           icon={<Activity />}
         />
-        <Stat label="USB gateway" value={state.gateway_status} hint="Serial transport" icon={<Cable />} />
+        <Stat label="Devices reporting" value={`${state.devices.filter((device) => device.reporting).length}/${state.devices.length}`} hint="Configured devices" icon={<Cable />} />
         <Stat
           label="Last telemetry"
           value={time(state.latest?.received)}
@@ -546,13 +549,16 @@ function Workspace({ connected }: { connected: boolean }) {
           icon={<Bell />}
         />
       </div>
-      <div className="source-note">Live mode waits for the registered UNO R4. No generated or fallback values are used.</div>
+      <div className="source-note">{state.session.mode === "live" ? "Live data is scoped to this project and its registered devices." : "Test data is isolated from live device state and never routes physical commands."}</div>
       <div className="workspace-grid">
         <section className="workspace-main">
           <div className="tabs" role="tablist">
             {[
+              ["overview", "Overview"],
+              ["readings", "Live readings"],
               ["twin", "Digital twin"],
               ["events", "Events & history"],
+              ["controls", "Controls"],
             ].map(([key, label]) => (
               <button
                 role="tab"
@@ -566,15 +572,51 @@ function Workspace({ connected }: { connected: boolean }) {
             ))}
           </div>
           <div className="tab-content">
+            {tab === "overview" && <ProjectOverview state={state} />}
+            {tab === "readings" && <Readings state={state} />}
             {tab === "twin" && (
               <Twin state={state} selectedId={selectedComponentId} onSelect={setSelectedComponentId} refresh={refresh} />
             )}{" "}
             {tab === "events" && <Events state={state} refresh={refresh} />}{" "}
+            {tab === "controls" && <ControlsPanel state={state} refresh={refresh} />}
           </div>
         </section>
       </div>
     </main>
   );
+}
+
+function ProjectOverview({ state }: { state: State }) {
+  const p = state.project;
+  return <div className="project-overview"><div className="stats">{Object.entries(p.graph.fields).map(([key, field]) => <Stat key={key} label={field.label} value={<>{display(state.latest?.readings[key])}<em>{field.unit}</em></>} hint={state.latest ? `Received ${time(state.latest.received)}` : "No reported value"} icon={<Activity />}/>)}</div><div className="overview-split"><section className="panel"><h3>Devices</h3>{state.devices.map((device) => <div className="detail-relation" key={device.id}><span>{device.id} · {device.connector}</span><strong>{device.reporting ? "reporting" : device.online ? "connected" : "unavailable"}</strong></div>)}</section><section className="panel"><h3>Recent actions</h3>{state.actions.length ? state.actions.slice(0, 5).map((action) => <div className="detail-relation" key={action.id}><span>{action.action.replace(":", " ")}</span><strong>{action.status.replace("_", " ")}</strong></div>) : <p className="detail-empty">No commands have been requested.</p>}</section></div><AgentPanel state={state}/></div>;
+}
+
+function Readings({ state }: { state: State }) {
+  const [field, setField] = useState(state.project.graph.primary_field);
+  const metric = state.project.graph.fields[field];
+  const rows = state.readings.map((reading) => ({ received: reading.received, value: reading.readings[field] }));
+  return <div className="readings-view"><div className="chart-header"><div><h3>Readings</h3><p>Stored observations for this project and selected session.</p></div><label>Metric<select value={field} onChange={(event) => setField(event.target.value)}>{Object.entries(state.project.graph.fields).map(([key, item]) => <option value={key} key={key}>{item.label} {item.unit}</option>)}</select></label></div>{metric.data_type === "number" ? <div className="metric-chart"><ResponsiveContainer width="100%" height="100%"><LineChart data={rows}><Line dataKey="value" stroke="#d4addf" dot={false} connectNulls={false}/><XAxis dataKey="received" tickFormatter={(value) => time(Number(value))}/><YAxis/><Tooltip labelFormatter={(value) => time(Number(value))}/></LineChart></ResponsiveContainer></div> : <div className="transition-list">{state.readings.slice().reverse().map((reading) => <div key={reading.id}><span>{time(reading.received)}</span><strong>{metricValue(reading.readings[field], metric.precision)}</strong></div>)}</div>}</div>;
+}
+
+function ControlsPanel({ state, refresh }: { state: State; refresh: () => void }) {
+  const [message, setMessage] = useState("");
+  const controls = state.project.graph.components.flatMap((component) => (component.controls || []).map((control) => ({ component, control })));
+  const run = async (component: Component, action: string, value: boolean) => { try { const result = await api<{ id: string; status: string }>(`/projects/${state.project.id}/sessions/${state.session.id}/actions`, { component_id: component.id, action, value }); setMessage(`Action ${result.id.slice(0, 8)} is ${result.status}. It completes only after matching telemetry.`); refresh(); } catch (error) { setMessage((error as Error).message); } };
+  return <div className="controls-view"><h3>Hardware controls</h3><p>Only capabilities declared by this project’s device configuration appear here.</p>{controls.length ? controls.map(({ component, control }) => <section className="panel" key={`${component.id}-${control.action}`}><h4>{component.name}</h4><p>{control.label}. Expected reported field: {control.expected.field}.</p><div className="component-actions"><button disabled={!controlReady(state, state.project, control)} onClick={() => run(component, control.action, true)}>Enable</button><button disabled={!controlReady(state, state.project, control)} onClick={() => run(component, control.action, false)}>Disable</button></div>{!controlReady(state, state.project, control) && <p className="detail-empty">The configured device transport must be live before control is available.</p>}</section>) : <div className="empty"><ShieldCheck/><h3>No hardware controls configured</h3><p>This project is read-only until a device capability and verification contract are registered.</p></div>}<p role="status">{message}</p></div>;
+}
+
+function AgentPanel({ state }: { state: State }) {
+  const [question, setQuestion] = useState(""), [answer, setAnswer] = useState<Answer | null>(null), [busy, setBusy] = useState(false);
+  const ask = async () => { if (!question.trim()) return; setBusy(true); try { setAnswer(await api<Answer>(`/projects/${state.project.id}/sessions/${state.session.id}/agent`, { question })); } finally { setBusy(false); } };
+  return <section className="panel agent-mini"><div><MessageSquare size={18}/><h3>Project agent</h3><p>Evidence is limited to this project and session.</p></div><div className="agent-question"><input value={question} onChange={(event) => setQuestion(event.target.value)} placeholder="Ask about this project"/><button onClick={ask} disabled={busy || !question.trim()} aria-label="Ask project agent"><Send size={16}/></button></div>{answer && <p>{answer.finding}<br/><small>{answer.uncertainty}</small></p>}</section>;
+}
+
+function AddProject() {
+  type AddedDevice = { device_id: string; connector: "usb" | "mqtt"; serial_port: string };
+  const navigate = useNavigate(); const [form, setForm] = useState({ name: "", template: "generic", device_id: "device-01", connector: "usb", serial_port: "", field: "sensor_value", unit: "value", freshness_seconds: 8 }); const [devices, setDevices] = useState<AddedDevice[]>([]); const [message, setMessage] = useState("");
+  const save = async (event: React.FormEvent) => { event.preventDefault(); const { field, unit, ...payload } = form; try { const project = await api<Project>("/projects", { ...payload, serial_port: form.serial_port || null, freshness_seconds: Number(form.freshness_seconds), interval_seconds: 1, mapping: { field, unit } }); await Promise.all(devices.map((device) => api(`/projects/${project.id}/devices`, { ...device, serial_port: device.serial_port || null }))); navigate(`/projects/${project.id}`); } catch (error) { setMessage((error as Error).message); } };
+  const updateDevice = (index: number, patch: Partial<AddedDevice>) => setDevices(devices.map((device, current) => current === index ? { ...device, ...patch } : device));
+  return <main className="page"><div className="page-heading"><div><h1>Add a project</h1><p>Name, template, device, connector, mapping, and freshness are saved together.</p></div></div><form className="panel onboarding" onSubmit={save}><label>Project name<input required value={form.name} onChange={(event) => setForm({...form, name: event.target.value})}/></label><label>Template<select value={form.template} onChange={(event) => setForm({...form, template: event.target.value})}><option value="led">LED or digital output</option><option value="temperature">Temperature monitoring</option><option value="water">Water level monitoring</option><option value="connectivity">Connectivity/RF monitoring</option><option value="generic">Generic sensor</option></select></label><label>Device identity<input required value={form.device_id} onChange={(event) => setForm({...form, device_id: event.target.value})}/></label><label>Connector<select value={form.connector} onChange={(event) => setForm({...form, connector: event.target.value})}><option value="usb">USB serial gateway</option><option value="mqtt">Direct Wi-Fi MQTT</option></select></label>{form.connector === "usb" && <label>Serial port<input placeholder="COM5" value={form.serial_port} onChange={(event) => setForm({...form, serial_port: event.target.value})}/></label>}<fieldset><legend>Additional devices</legend><p>Each device is scoped to this project and may use a different connector.</p>{devices.map((device, index) => <div className="extra-device" key={index}><label>Device identity<input required value={device.device_id} onChange={(event) => updateDevice(index, {device_id: event.target.value})}/></label><label>Connector<select value={device.connector} onChange={(event) => updateDevice(index, {connector: event.target.value as AddedDevice["connector"]})}><option value="usb">USB serial gateway</option><option value="mqtt">Direct Wi-Fi MQTT</option></select></label>{device.connector === "usb" && <label>Serial port<input placeholder="COM9" value={device.serial_port} onChange={(event) => updateDevice(index, {serial_port: event.target.value})}/></label>}<button type="button" onClick={() => setDevices(devices.filter((_, current) => current !== index))}>Remove</button></div>)}<button type="button" onClick={() => setDevices([...devices, {device_id: `device-${devices.length + 2}`, connector: "usb", serial_port: ""}])}>Add device</button></fieldset><label>Telemetry field<input required value={form.field} onChange={(event) => setForm({...form, field: event.target.value})}/></label><label>Unit<input required value={form.unit} onChange={(event) => setForm({...form, unit: event.target.value})}/></label><label>Freshness seconds<input type="number" min="3" value={form.freshness_seconds} onChange={(event) => setForm({...form, freshness_seconds: Number(event.target.value)})}/></label><button className="primary">Save project</button><p role="status">{message}</p></form></main>;
 }
 const componentRegistry: Record<string, { icon: typeof Box; label: string; accent: string }> = {
   controller: { icon: Zap, label: "Controller", accent: "#AFC6E9" },
@@ -595,36 +637,22 @@ const typeIcons: Record<string, typeof Box> = {
   operations_service: Server,
 };
 
-const relationshipStyle: Record<string, { color: string; dash?: string }> = {
-  physical: { color: "#D9B77A" },
-  data: { color: "#D4ADDF", dash: "6 5" },
-  control: { color: "#E49BA8" },
-  power: { color: "#DDBE78", dash: "10 4 2 4" },
-  context: { color: "#9CBFAF", dash: "2 5" },
+const relationshipStyle: Record<string, { color: string }> = {
+  physical: { color: "#d9b77a" }, control: { color: "#e49ba8" }, data: { color: "#d4addf" }, power: { color: "#ddbe78" }, context: { color: "#9cbfaf" },
 };
-
-function graphLayout(components: Component[], edges: Project["graph"]["edges"]) {
-  const rank = new Map(components.map((c) => [c.id, 0]));
-  for (let pass = 0; pass < components.length; pass += 1) {
-    edges.forEach((edge) => {
-      rank.set(edge.target, Math.max(rank.get(edge.target) || 0, (rank.get(edge.source) || 0) + 1));
-    });
-  }
-  const originalOrder = new Map(components.map((component, index) => [component.id, index]));
-  const ordered = [...components].sort((a, b) =>
-    (rank.get(a.id) || 0) - (rank.get(b.id) || 0) || (originalOrder.get(a.id) || 0) - (originalOrder.get(b.id) || 0),
-  );
-  const columnCount = Math.min(3, Math.max(1, components.length));
-  const positions = new Map<string, { x: number; y: number }>();
-  ordered.forEach((component, index) => positions.set(component.id, { x: (index % columnCount) * 250, y: Math.floor(index / columnCount) * 148 }));
-  return positions;
-}
 
 function metricValue(value: unknown, precision: number) {
   if (value === null || value === undefined) return "Unavailable";
-  if (typeof value === "number") return value.toLocaleString(undefined, { maximumFractionDigits: precision });
+  if (typeof value === "number") return value.toLocaleString("en-US", { maximumFractionDigits: precision });
   if (typeof value === "boolean") return value ? "On" : "Off";
   return String(value);
+}
+
+function controlReady(state: State, project: Project, control: { expected: { field: string } }) {
+  if (state.session.mode !== "live") return false;
+  const deviceId = project.graph.fields[control.expected.field]?.device_id;
+  const device = state.devices.find((item) => item.id === deviceId);
+  return !!device && (device.connector === "usb" ? device.online : device.reporting);
 }
 
 function TwinNode({ component, state, selected }: { component: Component; state: State; selected: boolean }) {
@@ -654,31 +682,16 @@ function Twin({ state, selectedId, onSelect, refresh }: { state: State; selected
   const defaultComponent = p.graph.components.find((component) => component.id === "led") || p.graph.components[0];
   const selected = p.graph.components.find((component) => component.id === selectedId) || defaultComponent;
   useEffect(() => { if (!selectedId && defaultComponent) onSelect(defaultComponent.id); }, [selectedId, defaultComponent, onSelect]);
-  const layoutKey = JSON.stringify({ components: p.graph.components.map((c) => c.id), edges: p.graph.edges.map((e) => [e.source, e.target]) });
-  const positions = useMemo(() => graphLayout(p.graph.components, p.graph.edges), [layoutKey]);
-  const nodes = p.graph.components.map((component) => ({
-    id: component.id, position: positions.get(component.id) || { x: 0, y: 0 },
-    data: { label: <TwinNode component={component} state={state} selected={component.id === selected.id}/> },
-    style: { background: "transparent", border: 0, padding: 0, width: 210 }, ariaLabel: component.name || component.label,
-  }));
-  const edges = p.graph.edges.map((edge) => {
-    const visual = relationshipStyle[edge.category] || relationshipStyle.context;
-    return { id: edge.id, source: edge.source, target: edge.target, label: edge.label,
-      ariaLabel: `${edge.label}: ${edge.source} to ${edge.target}`,
-      style: { stroke: visual.color, strokeWidth: 1.5, strokeDasharray: visual.dash },
-      labelStyle: { fill: "#C4B8C7", fontSize: 10 }, labelBgStyle: { fill: "#19141D", fillOpacity: 0.9 },
-      markerEnd: { type: MarkerType.ArrowClosed, color: visual.color } };
-  });
   const selectedMetrics = Object.entries(p.graph.fields).filter(([, metric]) => metric.component_id === selected.id);
   const categoricalMetric = selectedMetrics.find(([, metric]) => metric.data_type !== "number");
   const relations = p.graph.edges.filter((edge) => edge.source === selected.id || edge.target === selected.id);
   const relatedEvents = state.events.filter((event) => event.evidence.readings.some((reading) => selectedMetrics.some(([key]) => key in reading.readings)));
   const legend = [...new Map(p.graph.edges.map((edge) => [edge.category, edge])).values()];
-  const setLed = async (value: boolean) => {
+  const runControl = async (action: string, value: boolean) => {
     setActionBusy(true);
     setActionError("");
     try {
-      await api(`/projects/${p.id}/sessions/${state.session.id}/actions`, { component_id: selected.id, action: "set_led", value });
+      await api(`/projects/${p.id}/sessions/${state.session.id}/actions`, { component_id: selected.id, action, value });
       refresh();
     } catch (error) {
       setActionError((error as Error).message);
@@ -694,11 +707,8 @@ function Twin({ state, selectedId, onSelect, refresh }: { state: State; selected
         <div className="twin-legend" aria-label="Relationship legend">{legend.map((edge) => <span key={edge.category}><i style={{ background: relationshipStyle[edge.category]?.color }}/>{edge.category}</span>)}</div>
       </div>
       <div className="twin-stage">
-        <div className="twin">
-          <ReactFlow nodes={nodes} edges={edges} fitView fitViewOptions={{ padding: 0.18 }} nodesDraggable={false} nodesConnectable={false}
-            elementsSelectable onNodeClick={(_, node) => onSelect(node.id)} minZoom={0.25} maxZoom={1.8}>
-            <Background color="#48344e" gap={22}/><Controls showInteractive={false}/>
-          </ReactFlow>
+        <div className="twin twin-canvas" aria-label="Component representation">
+          {[...new Set(p.graph.components.map((component) => component.group || "System"))].map((group) => <section className="twin-group" key={group}><h4>{group}</h4><div>{p.graph.components.filter((component) => (component.group || "System") === group).map((component) => <button key={component.id} className="twin-card-button" onClick={() => onSelect(component.id)} aria-pressed={component.id === selected.id}><TwinNode component={component} state={state} selected={component.id === selected.id}/></button>)}</div></section>)}
         </div>
         <aside className="twin-details" aria-label="Selected component details">
           <div className="detail-heading"><span>{componentRegistry[selected.category]?.label || "Component"}{selected.group ? ` / ${selected.group}` : ""}</span><h3>{selected.name || selected.label}</h3><p>{selected.description || "No description provided."}</p></div>
@@ -714,7 +724,7 @@ function Twin({ state, selectedId, onSelect, refresh }: { state: State; selected
           {categoricalMetric && state.readings.length > 0 && <div className="detail-section"><h4>Recent transitions</h4><div className="transition-list">{state.readings.slice(-5).reverse().map((reading) => <div key={`${reading.received}-${categoricalMetric[0]}`}><span>{time(reading.received)}</span><strong>{metricValue(reading.readings[categoricalMetric[0]], categoricalMetric[1].precision)}</strong></div>)}</div></div>}
           <div className="detail-section"><h4>Relationships</h4>{relations.length ? relations.map((edge) => <div className="detail-relation" key={edge.id}><span>{edge.label}</span><strong>{edge.source === selected.id ? p.graph.components.find((c) => c.id === edge.target)?.name : p.graph.components.find((c) => c.id === edge.source)?.name}</strong></div>) : <p className="detail-empty">No relationships defined.</p>}</div>
           {!!Object.keys(selected.configuration).length && <div className="detail-section"><h4>Configuration</h4>{Object.entries(selected.configuration).map(([key, value]) => <div className="detail-relation" key={key}><span>{key.replaceAll("_", " ")}</span><strong>{display(value)}</strong></div>)}</div>}
-          <div className="detail-section"><h4>Events and actions</h4><p className="detail-empty">{relatedEvents.length ? `${relatedEvents.length} related event${relatedEvents.length === 1 ? "" : "s"}` : "No related events in this session."}</p>{selected.capabilities.includes("action:set_led") ? <><div className="component-actions"><button disabled={actionBusy || state.session.mode !== "live" || state.gateway_status !== "online"} onClick={() => setLed(true)}>Turn LED on</button><button disabled={actionBusy || state.session.mode !== "live" || state.gateway_status !== "online"} onClick={() => setLed(false)}>Turn LED off</button></div>{state.session.mode !== "live" && <p className="detail-empty">Select the live session to control hardware.</p>}{state.session.mode === "live" && state.gateway_status !== "online" && <p className="detail-empty">Connect the USB gateway to enable controls.</p>}{actionError && <p className="error">{actionError}</p>}{selectedActions.slice(0, 3).map((action) => <div className="detail-relation" key={action.id}><span>{action.action.replace(":", " ")}</span><strong>{action.status}</strong></div>)}</> : <p className="detail-empty">No implemented actions.</p>}</div>
+          <div className="detail-section"><h4>Events and actions</h4><p className="detail-empty">{relatedEvents.length ? `${relatedEvents.length} related event${relatedEvents.length === 1 ? "" : "s"}` : "No related events in this session."}</p>{selected.controls?.length ? <>{selected.controls.map((control) => <div className="component-actions" key={control.action}><button disabled={actionBusy || !controlReady(state, p, control)} onClick={() => runControl(control.action, true)}>{control.action === "set_led" ? "Turn on" : control.label}</button><button disabled={actionBusy || !controlReady(state, p, control)} onClick={() => runControl(control.action, false)}>{control.action === "set_led" ? "Turn off" : "Disable"}</button></div>)}{!selected.controls.every((control) => controlReady(state, p, control)) && <p className="detail-empty">Connect the configured live transport before controlling this component.</p>}{actionError && <p className="error">{actionError}</p>}{selectedActions.slice(0, 3).map((action) => <div className="detail-relation" key={action.id}><span>{action.action.replace(":", " ")}</span><strong>{action.status.replace("_", " ")}</strong></div>)}</> : <p className="detail-empty">No hardware controls are configured for this component.</p>}</div>
           <p className="detail-footnote">{state.session.mode} source · last update {time(state.latest?.received)}. This is a live operational representation, not a predictive model.</p>
         </aside>
       </div>
