@@ -1,0 +1,13 @@
+node_modules/
+.venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+data/
+dist/
+.env
+artifacts/
+firmware/agentwin/secrets.h
+broker/passwords
+broker/acl
+*.tsbuildinfo

@@ -1,0 +1,67 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": 1,
+      "title": "Schema Version",
+      "type": "integer"
+    },
+    "project_id": {
+      "pattern": "^[a-z0-9-]{1,64}$",
+      "title": "Project Id",
+      "type": "string"
+    },
+    "device_id": {
+      "pattern": "^[a-z0-9-]{1,64}$",
+      "title": "Device Id",
+      "type": "string"
+    },
+    "boot_id": {
+      "maxLength": 80,
+      "minLength": 1,
+      "title": "Boot Id",
+      "type": "string"
+    },
+    "sequence": {
+      "minimum": 0,
+      "title": "Sequence",
+      "type": "integer"
+    },
+    "uptime_ms": {
+      "minimum": 0,
+      "title": "Uptime Ms",
+      "type": "integer"
+    },
+    "readings": {
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "type": "number"
+          },
+          {
+            "type": "boolean"
+          },
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "title": "Readings",
+      "type": "object"
+    }
+  },
+  "required": [
+    "schema_version",
+    "project_id",
+    "device_id",
+    "boot_id",
+    "sequence",
+    "uptime_ms",
+    "readings"
+  ],
+  "title": "Telemetry",
+  "type": "object"
+}

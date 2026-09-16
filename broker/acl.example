@@ -1,0 +1,7 @@
+user agentwin-backend
+topic read agentwin/+/+/telemetry
+topic read agentwin/+/+/status
+
+user uno-r4-01
+topic write agentwin/smart-connectivity/uno-r4-01/telemetry
+topic write agentwin/smart-connectivity/uno-r4-01/status

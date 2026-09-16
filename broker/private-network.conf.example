@@ -1,0 +1,7 @@
+# Use ONLY on a private network, with generated password and ACL files.
+listener 1883
+allow_anonymous false
+password_file /mosquitto/config/passwords
+acl_file /mosquitto/config/acl
+persistence false
+max_packet_size 8192

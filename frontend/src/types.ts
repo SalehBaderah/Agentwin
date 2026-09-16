@@ -1,0 +1,148 @@
+export type Reading = {
+  id: number;
+  received: number;
+  readings: Record<string, number | boolean | string | null>;
+  original: null | { received: number };
+};
+export type Event = {
+  id: string;
+  kind: string;
+  created: number;
+  recovered: number | null;
+  acknowledged: number | null;
+  severity: string;
+  evidence: {
+    rule: string;
+    cause: string;
+    readings: Reading[];
+    source_mode: string;
+  };
+};
+export type Component = {
+  id: string;
+  name: string;
+  label: string;
+  type: string;
+  category: string;
+  kind: string;
+  description?: string;
+  group?: string | null;
+  bindings: string[];
+  capabilities: string[];
+  configuration: Record<string, unknown>;
+  visual: Record<string, unknown>;
+};
+export type Metric = {
+  unit: string;
+  label: string;
+  component: string;
+  component_id: string;
+  data_type: "number" | "boolean" | "categorical";
+  precision: number;
+  freshness_seconds: number | null;
+  calibrated: boolean;
+  source: string;
+};
+export type Project = {
+  id: string;
+  name: string;
+  arabic_title: string | null;
+  template: string;
+  description: string;
+  device_id: string;
+  connector: string;
+  freshness_seconds: number;
+  interval_seconds: number;
+  high_limit: number;
+  attenuator_inserted: boolean;
+  cable_description: string;
+  mapping: { field: string; unit: string };
+  graph: {
+    schema_version: number;
+    primary_field: string;
+    fields: Record<string, Metric>;
+    components: Component[];
+    edges: { id: string; source: string; target: string; kind: string; label: string; category: string }[];
+    groups: { id: string; name: string }[];
+  };
+};
+export type Session = {
+  id: string;
+  mode: string;
+  created: number;
+  scenario: string;
+  provenance: { origin: string; recording_id?: string };
+};
+export type State = {
+  project: Project;
+  session: Session;
+  sessions: Session[];
+  latest: Reading | null;
+  readings: Reading[];
+  events: Event[];
+  actions: { id: string; created: number; action: string; target: string; status: string }[];
+  status: string;
+  gateway_status: string;
+  estimated_rf_dbm: number | null;
+};
+export type Answer = {
+  available: boolean;
+  finding: string;
+  uncertainty: string;
+  next_step: string;
+  evidence: {
+    id: string;
+    timestamp: number;
+    readings?: Record<string, number | boolean | string | null>;
+    trigger?: string;
+  }[];
+};
+export const strings = {
+  brand: "Agentwin",
+  tagline: "Every system. Its own agent.",
+  overview: "Overview",
+  projects: "Projects",
+  events: "Events",
+  settings: "Settings",
+  add: "Add project",
+  unavailable: "AI agent unavailable",
+};
+export async function api<T>(
+  path: string,
+  body?: unknown,
+  method = "POST",
+): Promise<T> {
+  const response = await fetch(
+    "/api" + path,
+    body === undefined
+      ? undefined
+      : {
+          method,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        },
+  );
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(
+      typeof error.detail === "string"
+        ? error.detail
+        : "Check your configuration and try again.",
+    );
+  }
+  return response.json();
+}
+export const time = (value: number | null | undefined) =>
+  value
+    ? new Date(value * 1000).toLocaleTimeString([], {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      })
+    : "No data yet";
+export const display = (value: unknown) =>
+  value === null || value === undefined
+    ? "—"
+    : typeof value === "number"
+      ? Number(value.toFixed(4)).toLocaleString()
+      : String(value);
