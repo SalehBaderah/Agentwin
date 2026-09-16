@@ -83,7 +83,6 @@ export type State = {
   actions: { id: string; created: number; action: string; target: string; status: string }[];
   status: string;
   gateway_status: string;
-  estimated_rf_dbm: number | null;
 };
 export type Answer = {
   available: boolean;

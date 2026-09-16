@@ -8,7 +8,7 @@ from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from .models import ProjectCreate, SessionCreate, Scenario, Question, Settings, ComponentAction
+from .models import Question, Settings, ComponentAction
 from .store import Store
 from .runtime import Runtime
 from .templates import definition
@@ -58,29 +58,9 @@ def create_app(path=None, background=True):
     def projects():
         return [store.state(p['id']) for p in store.projects()]
 
-    @app.post('/api/projects', status_code=201)
-    def create(request: ProjectCreate):
-        return store.create_project(request)
-
     @app.get('/api/projects/{pid}')
     def state(pid: str, session: str | None = None):
         return store.state(pid, session)
-
-    @app.post('/api/projects/{pid}/sessions', status_code=201)
-    async def session(pid: str, body: SessionCreate):
-        if body.mode == 'replay' and not body.recording_id:
-            raise ValueError('Select an original recording')
-        if body.mode == 'replay' and not store.history(pid, body.recording_id):
-            raise ValueError('Selected recording has no samples')
-        s = store.create_session(pid, body.mode, body.recording_id)
-        if body.mode == 'replay':
-            runtime.tasks[s['id']] = asyncio.create_task(runtime.replay(pid, s['id'], body.recording_id))
-        return s
-
-    @app.post('/api/projects/{pid}/sessions/{sid}/scenario')
-    async def scenario(pid: str, sid: str, body: Scenario):
-        await runtime.scenario(pid, sid, body.scenario)
-        return {'scenario': body.scenario}
 
     @app.post('/api/projects/{pid}/sessions/{sid}/events/{eid}/acknowledge')
     def acknowledge(pid: str, sid: str, eid: str):

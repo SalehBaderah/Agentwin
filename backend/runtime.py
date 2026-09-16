@@ -1,7 +1,6 @@
 import asyncio
 import json
 import logging
-import math
 import os
 import time
 from paho.mqtt import client as mqtt
@@ -9,18 +8,9 @@ from .store import uid
 
 log = logging.getLogger(__name__)
 
-def sample(p, boot, sequence, elapsed, scenario='normal'):
-    value = round(1.2 + .045 * math.sin(sequence / 5) + (.65 if scenario == 'level-change' else 0), 4)
-    if p['template'] == 'connectivity':
-        readings = {'rf_adc_raw': round(value / 5 * 4095), 'rf_detector_v': value, 'wifi_connected': None, 'wifi_rssi_dbm': None}
-    else:
-        readings = {p['mapping']['field']: round(23 + math.sin(sequence / 5) + (12 if scenario == 'level-change' else 0), 2)}
-    return {'schema_version': 1, 'project_id': p['id'], 'device_id': p['device_id'], 'boot_id': boot, 'sequence': sequence, 'uptime_ms': int(elapsed * 1000), 'readings': readings}
-
 class Runtime:
     def __init__(self, store):
         self.store = store
-        self.tasks = {}
         self.mqtt_connected = False
         self.rejections = 0
         self.client = None
@@ -64,15 +54,6 @@ class Runtime:
         self.client.connect_async(os.getenv('MQTT_HOST', '127.0.0.1'), int(os.getenv('MQTT_PORT', '1883')), 15)
         self.client.loop_start()
 
-    async def scenario(self, pid, sid, scenario):
-        session = self.store.session(pid, sid)
-        if session['mode'] != 'simulated':
-            raise ValueError('Demo controls require a simulated session')
-        self.store.execute('UPDATE sessions SET scenario=? WHERE id=?', (scenario, sid))
-        if sid not in self.tasks or self.tasks[sid].done():
-            if scenario not in ('pause', 'stop'):
-                self.tasks[sid] = asyncio.create_task(self.produce(pid, sid))
-
     def component_action(self, pid, sid, component_id, action, value):
         session = self.store.session(pid, sid)
         if session['mode'] != 'live':
@@ -94,45 +75,15 @@ class Runtime:
             raise ValueError('Command could not be published')
         return {'id': action_id, 'status': 'requested', 'requested_value': value}
 
-    async def produce(self, pid, sid):
-        boot, seq, started = uid(), 0, time.monotonic()
-        while True:
-            scenario = self.store.session(pid, sid)['scenario']
-            if scenario == 'stop':
-                return
-            p = self.store.project(pid)
-            if scenario != 'pause':
-                self.store.ingest(sample(p, boot, seq, time.monotonic() - started, scenario), sid)
-                seq += 1
-            await asyncio.sleep(p['interval_seconds'])
-
-    async def replay(self, pid, sid, recording):
-        rows = self.store.history(pid, recording, 180)
-        if not rows:
-            return
-        boot = uid()
-        for i, r in enumerate(rows):
-            if i:
-                await asyncio.sleep(min(max(r['received'] - rows[i-1]['received'], .05), 5))
-            p = self.store.project(pid)
-            payload = {'schema_version': 1, 'project_id': pid, 'device_id': p['device_id'], 'boot_id': boot, 'sequence': i, 'uptime_ms': int((r['received']-rows[0]['received'])*1000), 'readings': r['readings']}
-            self.store.ingest(payload, sid, original={'reading_id': r['id'], 'received': r['received'], 'session': recording, 'provenance': json.loads(self.store.session(pid, recording)['provenance'])})
-
     async def tick(self):
         while True:
             for p in self.store.projects():
-                for mode in ('live', 'simulated'):
-                    s = self.store.session(p['id'], mode=mode)
-                    # Unstarted simulated sessions do not create phantom missing-data events.
-                    if mode == 'live' or s['scenario'] != 'stop':
-                        with self.store.lock:
-                            self.store.evaluate(p['id'], s['id'])
+                s = self.store.session(p['id'], mode='live')
+                with self.store.lock:
+                    self.store.evaluate(p['id'], s['id'])
             await asyncio.sleep(1)
 
     async def close(self):
-        for task in self.tasks.values():
-            task.cancel()
-        await asyncio.gather(*self.tasks.values(), return_exceptions=True)
         if self.client:
             self.client.disconnect()
             self.client.loop_stop()

@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { FormEvent } from "react";
 import { createRoot } from "react-dom/client";
 import {
   BrowserRouter,
@@ -8,7 +7,6 @@ import {
   Route,
   Routes,
   useParams,
-  useNavigate,
 } from "react-router-dom";
 import {
   Activity,
@@ -21,25 +19,15 @@ import {
   Cable,
   Check,
   ChevronRight,
-  CircleHelp,
   Database,
-  Droplets,
   FlaskConical,
-  Gauge,
   Layers,
   LayoutDashboard,
-  MessageSquare,
-  MapPin,
-  Plus,
   Radio,
   Router,
-  Send,
   Server,
   Settings as SettingsIcon,
   ShieldCheck,
-  Sparkles,
-  Thermometer,
-  Wifi,
   Zap,
   X,
 } from "lucide-react";
@@ -51,9 +39,8 @@ import {
   XAxis,
   YAxis,
   Tooltip,
-  CartesianGrid,
 } from "recharts";
-import type { Answer, Component, Event as ProjectEvent, Project, State } from "./types";
+import type { Component, Event as ProjectEvent, Project, State } from "./types";
 import { api, display, strings, time } from "./types";
 import "@xyflow/react/dist/style.css";
 import "@fontsource-variable/dm-sans";
@@ -212,10 +199,6 @@ function App() {
               element={<Overview states={states} projectOnly />}
             />
             <Route
-              path="/projects/new"
-              element={<AddProject refresh={refresh} />}
-            />
-            <Route
               path="/projects/:id"
               element={<Workspace connected={connected} />}
             />
@@ -256,10 +239,6 @@ function Overview({
             Current state, recent evidence, and anything that needs attention.
           </p>
         </div>
-        <Link className="button primary" to="/projects/new">
-          <Plus size={17} />
-          {strings.add}
-        </Link>
       </div>
       {!projectOnly && (
         <>
@@ -368,16 +347,6 @@ function Overview({
             </div>
           </Link>
         ))}
-        <Link className="new-card" to="/projects/new">
-          <span>
-            <Plus size={23} />
-          </span>
-          <h3>Connect another system</h3>
-          <p>Choose a template and register a device.</p>
-          <span className="text-link">
-            Add project <ArrowRight size={15} />
-          </span>
-        </Link>
       </div>
       <div className="section-heading">
         <h2>Needs attention</h2>
@@ -417,7 +386,7 @@ function Overview({
             <div>
               <strong>No open events in these sessions</strong>
               <p>
-                Start a simulation to explore live readings and event detection.
+                Connect the UNO R4 and USB gateway to receive live LED telemetry.
               </p>
             </div>
           </div>
@@ -457,24 +426,21 @@ function Stat({
 function Workspace({ connected }: { connected: boolean }) {
   const { id } = useParams();
   const [state, setState] = useState<State | null>(null),
-    [sid, setSid] = useState(""),
     [error, setError] = useState(""),
-    [busy, setBusy] = useState(false),
     [selectedComponentId, setSelectedComponentId] = useState<string | null>(null);
   const [tab, setTab] = useState(
-    new URLSearchParams(location.search).get("tab") || "readings",
+    new URLSearchParams(location.search).get("tab") || "twin",
   );
   const refresh = useCallback(() => {
-    api<State>("/projects/" + id + (sid ? "?session=" + sid : ""))
+    api<State>("/projects/" + id)
       .then((s) => {
         setState(s);
         setError("");
       })
       .catch((e) => setError(e.message));
-  }, [id, sid]);
+  }, [id]);
   useEffect(() => {
     setState(null);
-    setSid("");
     setSelectedComponentId(null);
   }, [id]);
   useEffect(() => {
@@ -484,7 +450,7 @@ function Workspace({ connected }: { connected: boolean }) {
     let stopped = false;
     const connect = () => {
       socket = new WebSocket(
-        `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/api/ws?project=${id}${sid ? "&session=" + sid : ""}`,
+        `${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/api/ws?project=${id}`,
       );
       socket.onopen = refresh;
       socket.onmessage = (e) => {
@@ -505,40 +471,14 @@ function Workspace({ connected }: { connected: boolean }) {
       clearTimeout(timer);
       socket?.close();
     };
-  }, [refresh, id, sid]);
+  }, [refresh, id]);
   if (!state)
     return (
       <main className="page">
         <div className="empty">{error || "Loading project…"}</div>
       </main>
     );
-  const p = state.project,
-    base = `/projects/${p.id}/sessions/${state.session.id}`;
-  const command = async (scenario: string) => {
-    setBusy(true);
-    try {
-      await api(base + "/scenario", { scenario });
-      refresh();
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  };
-  const replay = async () => {
-    setBusy(true);
-    try {
-      const result = await api<{ id: string }>(`/projects/${p.id}/sessions`, {
-        mode: "replay",
-        recording_id: state.session.id,
-      });
-      setSid(result.id);
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  };
+  const p = state.project;
   return (
     <main className="page project-page">
       <Link className="back" to="/projects">
@@ -546,11 +486,7 @@ function Workspace({ connected }: { connected: boolean }) {
       </Link>
       <div className="page-heading">
         <div>
-          <div className="eyebrow">
-            {p.template === "connectivity"
-              ? "Connectivity showcase"
-              : "Generic sensor project"}
-          </div>
+          <div className="eyebrow">Physical LED project</div>
           <h1>{p.name}</h1>
           {p.arabic_title && (
             <p className="project-arabic" dir="rtl" lang="ar">
@@ -558,28 +494,10 @@ function Workspace({ connected }: { connected: boolean }) {
             </p>
           )}
         </div>
-        <div className="source-picker">
-          <label htmlFor="source">Data source / session</label>
-          <select
-            id="source"
-            value={state.session.id}
-            onChange={(e) => setSid(e.target.value)}
-          >
-            {state.sessions.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.mode} · {time(s.created)}
-              </option>
-            ))}
-          </select>
-        </div>
+        <Badge tone="success">Live hardware only</Badge>
       </div>
       <div className="status-line">
-        <Badge tone={state.session.mode === "live" ? "success" : ""}>
-          {state.session.mode}
-          {state.session.mode === "replay"
-            ? " · " + state.session.provenance.origin
-            : ""}
-        </Badge>
+        <Badge tone="success">live</Badge>
         <Badge
           tone={
             connected && state.status === "reporting" ? "success" : "warning"
@@ -614,33 +532,7 @@ function Workspace({ connected }: { connected: boolean }) {
           }
           icon={<Activity />}
         />
-        <Stat
-          label={
-            p.template === "connectivity"
-              ? "Arduino Wi-Fi RSSI"
-              : "Source provenance"
-          }
-          value={
-            p.template === "connectivity" ? (
-              <>
-                {display(state.latest?.readings.wifi_rssi_dbm)}
-                <em>dBm</em>
-              </>
-            ) : (
-              state.session.provenance.origin
-            )
-          }
-          hint={
-            p.template === "connectivity"
-              ? state.latest?.readings.wifi_connected === true
-                ? "Interface reports connected"
-                : state.latest?.readings.wifi_connected === false
-                  ? "Interface reports disconnected"
-                  : "Network interface measurement unavailable"
-              : "Synthetic until live hardware is connected"
-          }
-          icon={<Wifi />}
-        />
+        <Stat label="USB gateway" value={state.gateway_status} hint="Serial transport" icon={<Cable />} />
         <Stat
           label="Last telemetry"
           value={time(state.latest?.received)}
@@ -654,56 +546,13 @@ function Workspace({ connected }: { connected: boolean }) {
           icon={<Bell />}
         />
       </div>
-      {state.session.mode === "simulated" ? (
-        <section className="demo-bar">
-          <div>
-            <FlaskConical size={20} />
-            <span>
-              <strong>Simulation lab</strong>
-              <small>Deterministic synthetic data · no physical device</small>
-            </span>
-          </div>
-          <div className="demo-buttons">
-            {[
-              ["normal", "Start normal"],
-              ["level-change", "Detector / level change"],
-              ["pause", "Pause telemetry"],
-              ["recovery", "Recover"],
-            ].map(([s, label]) => (
-              <button
-                disabled={busy}
-                key={s}
-                className={state.session.scenario === s ? "selected" : ""}
-                onClick={() => command(s)}
-              >
-                {label}
-              </button>
-            ))}
-            <button disabled={busy || !state.readings.length} onClick={replay}>
-              Replay recording
-            </button>
-          </div>
-        </section>
-      ) : (
-        <div className="source-note">
-          {state.session.mode === "live"
-            ? "Live mode waits for registered hardware. It never falls back to simulation."
-            : "Replay of stored data; original provenance and receipt times are preserved. Event detection is disabled for replay."}
-          {state.session.mode === "live" && state.readings.length > 0 && (
-            <button disabled={busy} onClick={replay}>
-              Replay recording
-            </button>
-          )}
-        </div>
-      )}
+      <div className="source-note">Live mode waits for the registered UNO R4. No generated or fallback values are used.</div>
       <div className="workspace-grid">
         <section className="workspace-main">
           <div className="tabs" role="tablist">
             {[
-              ["readings", "Live readings"],
               ["twin", "Digital twin"],
               ["events", "Events & history"],
-              ["settings", "Setup"],
             ].map(([key, label]) => (
               <button
                 role="tab"
@@ -717,255 +566,41 @@ function Workspace({ connected }: { connected: boolean }) {
             ))}
           </div>
           <div className="tab-content">
-            {tab === "readings" && <Readings state={state} />}{" "}
             {tab === "twin" && (
               <Twin state={state} selectedId={selectedComponentId} onSelect={setSelectedComponentId} refresh={refresh} />
             )}{" "}
             {tab === "events" && <Events state={state} refresh={refresh} />}{" "}
-            {tab === "settings" && (
-              <ProjectSettings project={p} refresh={refresh} />
-            )}
           </div>
         </section>
-        <Agent
-          key={state.session.id}
-          state={state}
-          selectedComponent={p.graph.components.find((c) => c.id === selectedComponentId) || null}
-        />
       </div>
     </main>
   );
 }
-function Readings({ state }: { state: State }) {
-  const p = state.project,
-    field = p.graph.primary_field,
-    meta = p.graph.fields[field];
-  const chart = useMemo(() => {
-    const result: Record<string, unknown>[] = [];
-    state.readings.forEach((r, i) => {
-      if (
-        i &&
-        r.received - state.readings[i - 1].received > p.freshness_seconds
-      )
-        result.push({
-          received: state.readings[i - 1].received + p.interval_seconds,
-          [field]: null,
-        });
-      result.push({ received: r.received, ...r.readings });
-    });
-    return result;
-  }, [state.readings, p, field]);
-  return (
-    <>
-      <div className="chart-header">
-        <div>
-          <h3>{meta.label}</h3>
-          <p>
-            {state.session.mode} · {meta.unit} · Latest 180 samples
-          </p>
-        </div>
-        <span className="chart-legend">
-          <i />
-          {meta.label}
-        </span>
-      </div>
-      {chart.length ? (
-        <div className="chart">
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart
-              data={chart}
-              margin={{ top: 15, right: 16, bottom: 5, left: 0 }}
-            >
-              <CartesianGrid
-                stroke="#332739"
-                strokeDasharray="3 5"
-                vertical={false}
-              />
-              <XAxis
-                dataKey="received"
-                type="number"
-                domain={["dataMin", "dataMax"]}
-                tickFormatter={(n) =>
-                  new Date(n * 1000).toLocaleTimeString([], { hour12: false })
-                }
-                tick={{ fill: "#A496AA", fontSize: 11 }}
-                minTickGap={45}
-              />
-              <YAxis
-                tick={{ fill: "#C4B8C7", fontSize: 11 }}
-                width={48}
-                domain={["auto", "auto"]}
-                unit={" " + meta.unit}
-              />
-              <Tooltip
-                labelFormatter={(n) => time(Number(n))}
-                contentStyle={{
-                  background: "#261B2B",
-                  border: "1px solid #69536f",
-                  borderRadius: 8,
-                }}
-              />
-              <Line
-                type="linear"
-                dataKey={field}
-                name={meta.label}
-                stroke="#D0A7DC"
-                strokeWidth={2.5}
-                dot={false}
-                connectNulls={false}
-                isAnimationActive={false}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      ) : (
-        <div className="empty">
-          <Activity size={32} />
-          <h3>Ready for the first reading</h3>
-          <p>
-            {state.session.mode === "simulated"
-              ? "Select Start normal in the simulation lab."
-              : "Connect the registered device to start receiving telemetry."}
-          </p>
-        </div>
-      )}
-      <div className="reading-table">
-        <div className="section-heading">
-          <h3>Measurement details</h3>
-          <span className="secondary">{time(state.latest?.received)}</span>
-        </div>
-        {state.latest?.original && (
-          <p>
-            Original recording receipt: {time(state.latest.original.received)} ·
-            Replayed {time(state.latest.received)}
-          </p>
-        )}
-        {Object.entries(p.graph.fields).map(([key, meta]) => (
-          <div className="measurement" key={key}>
-            <span>{meta.label}</span>
-            <strong>
-              {display(state.latest?.readings[key])} <small>{meta.unit}</small>
-            </strong>
-            <span className="secondary">
-              {state.latest?.readings[key] === null ||
-              state.latest?.readings[key] === undefined
-                ? "Unavailable"
-                : state.status === "reporting"
-                  ? "Received"
-                  : "Historical"}
-            </span>
-          </div>
-        ))}
-        {p.template === "connectivity" && (
-          <div className="measurement">
-            <span>Estimated RF power</span>
-            <strong>— dBm</strong>
-            <span className="secondary">No validated calibration</span>
-          </div>
-        )}
-      </div>
-      {p.template === "connectivity" &&
-        state.readings.some(
-          (r) => typeof r.readings.wifi_rssi_dbm === "number",
-        ) && (
-          <>
-            <div className="chart-header">
-              <div>
-                <h3>Arduino Wi-Fi RSSI</h3>
-                <p>
-                  Network interface · dBm · {state.session.mode} · Latest 180
-                  samples
-                </p>
-              </div>
-            </div>
-            <div className="chart">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart
-                  data={chart}
-                  margin={{ top: 15, right: 16, bottom: 5, left: 8 }}
-                >
-                  <CartesianGrid
-                    stroke="#332739"
-                    strokeDasharray="3 5"
-                    vertical={false}
-                  />
-                  <XAxis
-                    dataKey="received"
-                    type="number"
-                    domain={["dataMin", "dataMax"]}
-                    tickFormatter={(n) =>
-                      new Date(n * 1000).toLocaleTimeString([], {
-                        hour12: false,
-                      })
-                    }
-                    minTickGap={45}
-                    tick={{ fill: "#A496AA", fontSize: 11 }}
-                  />
-                  <YAxis
-                    width={56}
-                    domain={["auto", "auto"]}
-                    tick={{ fill: "#C4B8C7", fontSize: 11 }}
-                  />
-                  <Tooltip
-                    labelFormatter={(n) => time(Number(n))}
-                    contentStyle={{
-                      background: "#261B2B",
-                      border: "1px solid #69536f",
-                    }}
-                  />
-                  <Line
-                    dataKey="wifi_rssi_dbm"
-                    name="Wi-Fi RSSI (dBm)"
-                    stroke="#9CBFAF"
-                    dot={false}
-                    connectNulls={false}
-                    isAnimationActive={false}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </>
-        )}
-      <div className="insight-note">
-        <CircleHelp size={18} />
-        <p>
-          {p.template === "connectivity"
-            ? "The detector measures RF level at its input. A changed reading does not identify a frequency, interference source, or connection fault."
-            : "This generic sensor uses the configured field and unit mapping. Simulated readings are demonstration data."}
-        </p>
-      </div>
-    </>
-  );
-}
-const componentRegistry: Record<
-  string,
-  { icon: typeof Box; label: string; accent: string }
-> = {
-  sensor: { icon: Gauge, label: "Sensor", accent: "#D4ADDF" },
+const componentRegistry: Record<string, { icon: typeof Box; label: string; accent: string }> = {
   controller: { icon: Zap, label: "Controller", accent: "#AFC6E9" },
   actuator: { icon: Activity, label: "Actuator", accent: "#E49BA8" },
   gateway: { icon: Router, label: "Gateway", accent: "#AFC6E9" },
-  passive: { icon: Cable, label: "Passive component", accent: "#D9B77A" },
-  software: { icon: Server, label: "Software service", accent: "#BFA6CA" },
-  asset: { icon: MapPin, label: "Physical asset", accent: "#9CBFAF" },
+  passive: { icon: Cable, label: "Wired component", accent: "#D9B77A" },
+  power: { icon: Zap, label: "Ground", accent: "#DDBE78" },
+  software: { icon: Server, label: "Application", accent: "#BFA6CA" },
   generic: { icon: Box, label: "Component", accent: "#B8ACBC" },
 };
 
 const typeIcons: Record<string, typeof Box> = {
-  temperature_sensor: Thermometer,
-  water_level_sensor: Droplets,
-  tank: Droplets,
-  rf_antenna: Radio,
-  rf_detector: Gauge,
+  edge_controller: Zap,
+  indicator_led: Activity,
   telemetry_gateway: Router,
+  resistor: Cable,
+  ground: Zap,
+  operations_service: Server,
 };
 
 const relationshipStyle: Record<string, { color: string; dash?: string }> = {
   physical: { color: "#D9B77A" },
   data: { color: "#D4ADDF", dash: "6 5" },
   control: { color: "#E49BA8" },
-  context: { color: "#9CBFAF", dash: "2 5" },
   power: { color: "#DDBE78", dash: "10 4 2 4" },
+  context: { color: "#9CBFAF", dash: "2 5" },
 };
 
 function graphLayout(components: Component[], edges: Project["graph"]["edges"]) {
@@ -1016,8 +651,9 @@ function Twin({ state, selectedId, onSelect, refresh }: { state: State; selected
   const [actionBusy, setActionBusy] = useState(false);
   const [actionError, setActionError] = useState("");
   const p = state.project;
-  const selected = p.graph.components.find((component) => component.id === selectedId) || p.graph.components[0];
-  useEffect(() => { if (!selectedId && p.graph.components[0]) onSelect(p.graph.components[0].id); }, [selectedId, p.graph.components, onSelect]);
+  const defaultComponent = p.graph.components.find((component) => component.id === "led") || p.graph.components[0];
+  const selected = p.graph.components.find((component) => component.id === selectedId) || defaultComponent;
+  useEffect(() => { if (!selectedId && defaultComponent) onSelect(defaultComponent.id); }, [selectedId, defaultComponent, onSelect]);
   const layoutKey = JSON.stringify({ components: p.graph.components.map((c) => c.id), edges: p.graph.edges.map((e) => [e.source, e.target]) });
   const positions = useMemo(() => graphLayout(p.graph.components, p.graph.edges), [layoutKey]);
   const nodes = p.graph.components.map((component) => ({
@@ -1038,10 +674,6 @@ function Twin({ state, selectedId, onSelect, refresh }: { state: State; selected
   const relations = p.graph.edges.filter((edge) => edge.source === selected.id || edge.target === selected.id);
   const relatedEvents = state.events.filter((event) => event.evidence.readings.some((reading) => selectedMetrics.some(([key]) => key in reading.readings)));
   const legend = [...new Map(p.graph.edges.map((edge) => [edge.category, edge])).values()];
-  const askAgent = () => {
-    onSelect(selected.id);
-    window.dispatchEvent(new CustomEvent("agentwin:ask-component", { detail: { id: selected.id, name: selected.name || selected.label } }));
-  };
   const setLed = async (value: boolean) => {
     setActionBusy(true);
     setActionError("");
@@ -1083,7 +715,6 @@ function Twin({ state, selectedId, onSelect, refresh }: { state: State; selected
           <div className="detail-section"><h4>Relationships</h4>{relations.length ? relations.map((edge) => <div className="detail-relation" key={edge.id}><span>{edge.label}</span><strong>{edge.source === selected.id ? p.graph.components.find((c) => c.id === edge.target)?.name : p.graph.components.find((c) => c.id === edge.source)?.name}</strong></div>) : <p className="detail-empty">No relationships defined.</p>}</div>
           {!!Object.keys(selected.configuration).length && <div className="detail-section"><h4>Configuration</h4>{Object.entries(selected.configuration).map(([key, value]) => <div className="detail-relation" key={key}><span>{key.replaceAll("_", " ")}</span><strong>{display(value)}</strong></div>)}</div>}
           <div className="detail-section"><h4>Events and actions</h4><p className="detail-empty">{relatedEvents.length ? `${relatedEvents.length} related event${relatedEvents.length === 1 ? "" : "s"}` : "No related events in this session."}</p>{selected.capabilities.includes("action:set_led") ? <><div className="component-actions"><button disabled={actionBusy || state.session.mode !== "live" || state.gateway_status !== "online"} onClick={() => setLed(true)}>Turn LED on</button><button disabled={actionBusy || state.session.mode !== "live" || state.gateway_status !== "online"} onClick={() => setLed(false)}>Turn LED off</button></div>{state.session.mode !== "live" && <p className="detail-empty">Select the live session to control hardware.</p>}{state.session.mode === "live" && state.gateway_status !== "online" && <p className="detail-empty">Connect the USB gateway to enable controls.</p>}{actionError && <p className="error">{actionError}</p>}{selectedActions.slice(0, 3).map((action) => <div className="detail-relation" key={action.id}><span>{action.action.replace(":", " ")}</span><strong>{action.status}</strong></div>)}</> : <p className="detail-empty">No implemented actions.</p>}</div>
-          <button className="ask-component" onClick={askAgent}><Sparkles size={15}/>Ask agent about this component</button>
           <p className="detail-footnote">{state.session.mode} source · last update {time(state.latest?.received)}. This is a live operational representation, not a predictive model.</p>
         </aside>
       </div>
@@ -1194,551 +825,6 @@ function Events({ state, refresh }: { state: State; refresh: () => void }) {
     </>
   );
 }
-function Agent({ state, selectedComponent }: { state: State; selectedComponent: Component | null }) {
-  const [question, setQuestion] = useState(""),
-    [result, setResult] = useState<Answer | null>(null),
-    [busy, setBusy] = useState(false),
-    [configured, setConfigured] = useState(false),
-    [previous, setPrevious] = useState<{ question: string; answer: Answer }[]>(
-      [],
-    );
-  const base = `/projects/${state.project.id}/sessions/${state.session.id}`;
-  useEffect(() => {
-    api<{ agent_configured: boolean }>("/health")
-      .then((h) => setConfigured(h.agent_configured))
-      .catch(() => setConfigured(false));
-    api<{ question: string; answer: Answer }[]>(base + "/conversations")
-      .then(setPrevious)
-      .catch(() => {});
-  }, [base]);
-  useEffect(() => {
-    const prepareQuestion = (event: Event) => {
-      const detail = (event as CustomEvent<{ name: string }>).detail;
-      setQuestion(`How fresh are the measurements for ${detail.name}?`);
-      requestAnimationFrame(() => document.getElementById("question")?.focus());
-    };
-    window.addEventListener("agentwin:ask-component", prepareQuestion);
-    return () => window.removeEventListener("agentwin:ask-component", prepareQuestion);
-  }, []);
-  const ask = async (text: string) => {
-    if (!text.trim()) return;
-    setBusy(true);
-    setQuestion(text);
-    try {
-      setResult(await api<Answer>(base + "/agent", { question: text, component_id: selectedComponent?.id || null }));
-    } catch {
-      setResult({
-        available: false,
-        finding: "AI agent unavailable",
-        uncertainty: "The backend could not be reached.",
-        next_step: "Reconnect and retry.",
-        evidence: [],
-      });
-    } finally {
-      setBusy(false);
-    }
-  };
-  return (
-    <aside className="agent-panel">
-      <div className="agent-heading">
-        <span className="agent-icon">
-          <Sparkles size={20} />
-        </span>
-        <div>
-          <h3>Project agent</h3>
-          <small>
-            {selectedComponent ? `${selectedComponent.name || selectedComponent.label} selected` : configured
-              ? "Provider configured · availability checked on request"
-              : strings.unavailable}
-          </small>
-        </div>
-        <span className="dot" />
-      </div>
-      <div className="agent-body">
-        <span className="eyebrow">Project context</span>
-        <h3>
-          Understand what
-          <br />
-          your system is telling you.
-        </h3>
-        <p>
-          A dedicated assistant with access to this project’s readings,
-          components, and event evidence.
-        </p>
-        <div className="agent-scope">
-          <ShieldCheck size={15} /> {state.session.mode} session · {selectedComponent ? `${selectedComponent.name || selectedComponent.label} context` : "Project scoped"}
-        </div>
-        <div className="suggestions">
-          {(selectedComponent ? [
-            "What changed recently?",
-            "How fresh is this measurement?",
-            "What actions are available?",
-          ] : ["What changed recently?", "Is this device still reporting?", "What evidence supports this event?"]).map((q) => (
-            <button key={q} disabled={busy} onClick={() => ask(q)}>
-              {q}
-              <ArrowUpRight size={14} />
-            </button>
-          ))}
-        </div>
-        {!configured && !result && (
-          <div className="agent-notice">
-            <MessageSquare size={17} />
-            <p>
-              Add server-side provider credentials to enable analysis.
-              Monitoring works without an AI connection.
-            </p>
-          </div>
-        )}
-        {busy && <p role="status">Retrieving project evidence…</p>}
-        {result && (
-          <div className="agent-answer" aria-live="polite">
-            <Badge tone={result.available ? "success" : "warning"}>
-              {result.available ? "Agent response" : strings.unavailable}
-            </Badge>
-            <h4>Finding</h4>
-            <p>{result.finding}</p>
-            <h4>Uncertainty</h4>
-            <p>{result.uncertainty}</p>
-            <h4>Next step</h4>
-            <p>{result.next_step}</p>
-            {result.evidence.map((e) => (
-              <details key={e.id}>
-                <summary>
-                  {e.id} · {time(e.timestamp)}
-                </summary>
-                <p>
-                  {e.trigger ||
-                    Object.entries(e.readings || {})
-                      .map(([k, v]) => `${k}: ${display(v)}`)
-                      .join(", ")}
-                </p>
-              </details>
-            ))}
-          </div>
-        )}
-        {previous.length > 0 && (
-          <details>
-            <summary>Previous conversation ({previous.length})</summary>
-            {previous.map((p, i) => (
-              <div className="prior-answer" key={i}>
-                <strong>{p.question}</strong>
-                <p>{p.answer.finding}</p>
-              </div>
-            ))}
-          </details>
-        )}
-      </div>
-      <form
-        className="agent-input"
-        onSubmit={(e) => {
-          e.preventDefault();
-          ask(question);
-        }}
-      >
-        <label className="sr-only" htmlFor="question">
-          Ask the project agent
-        </label>
-        <input
-          id="question"
-          value={question}
-          onChange={(e) => setQuestion(e.target.value)}
-          placeholder="Ask about this system…"
-          maxLength={2000}
-        />
-        <button aria-label="Send question" disabled={busy || !question.trim()}>
-          <Send size={17} />
-        </button>
-      </form>
-      <div className="agent-footnote">
-        Read-only analysis. Physical control unavailable.
-      </div>
-    </aside>
-  );
-}
-function AddProject({ refresh }: { refresh: () => void }) {
-  const navigate = useNavigate();
-  const [step, setStep] = useState(0),
-    [error, setError] = useState(""),
-    [busy, setBusy] = useState(false);
-  const [form, setForm] = useState({
-    name: "",
-    template: "generic",
-    device_id: "sensor-01",
-    connector: "usb",
-    mapping: { field: "sensor_value", unit: "°C" },
-    freshness_seconds: 8,
-    interval_seconds: 1,
-    high_limit: 30,
-    attenuator_inserted: false,
-    cable_description: "SMA cable; verify actual arrangement",
-  });
-  const steps = [
-    "Project identity",
-    "Template",
-    "Device & connector",
-    "Fields & freshness",
-  ];
-  const submit = async (e: FormEvent) => {
-    e.preventDefault();
-    if (step < 3) {
-      setStep(step + 1);
-      return;
-    }
-    setBusy(true);
-    try {
-      const p = await api<Project>("/projects", form);
-      refresh();
-      navigate("/projects/" + p.id + "?tab=settings");
-    } catch (err) {
-      setError((err as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  };
-  return (
-    <main className="page">
-      <Link className="back" to="/">
-        All projects
-      </Link>
-      <div className="page-heading">
-        <div>
-          <div className="eyebrow">New connected system</div>
-          <h1>Give your system a workspace.</h1>
-          <p>A reusable template. A dedicated view. Its own agent.</p>
-        </div>
-      </div>
-      <div className="setup-layout">
-        <ol className="steps">
-          {steps.map((s, i) => (
-            <li className={step === i ? "active" : ""} key={s}>
-              <span>{i < step ? <Check size={16} /> : i + 1}</span>
-              {s}
-            </li>
-          ))}
-        </ol>
-        <form className="panel setup-form" onSubmit={submit}>
-          <h2>{steps[step]}</h2>
-          {step === 0 && (
-            <label>
-              Project name
-              <input
-                required
-                autoFocus
-                value={form.name}
-                maxLength={100}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                placeholder="e.g. Water level monitor"
-              />
-            </label>
-          )}
-          {step === 1 && (
-            <div className="template-options">
-              {[
-                [
-                  "generic",
-                  "Generic sensor",
-                  "One numeric reading with your own field and unit.",
-                ],
-                [
-                  "connectivity",
-                  "Smart Systems Connectivity",
-                  "AD8313 detector and Arduino telemetry.",
-                ],
-                [
-                  "temperature",
-                  "Temperature monitoring",
-                  "A temperature sensor associated with a room.",
-                ],
-                [
-                  "water",
-                  "Water monitoring",
-                  "A level sensor associated with a tank.",
-                ],
-              ].map(([key, label, detail]) => (
-                <button
-                  type="button"
-                  className={form.template === key ? "selected" : ""}
-                  key={key}
-                  onClick={() =>
-                    setForm({
-                      ...form,
-                      template: key,
-                      mapping:
-                        key === "temperature"
-                          ? { field: "temperature_c", unit: "°C" }
-                          : key === "water"
-                            ? { field: "water_level_cm", unit: "cm" }
-                            : key === "connectivity"
-                              ? { field: "rf_detector_v", unit: "V" }
-                              : { field: "sensor_value", unit: "°C" },
-                      high_limit:
-                        key === "connectivity" ? 1.6 : key === "water" ? 80 : 30,
-                    })
-                  }
-                >
-                  <Radio size={22} />
-                  <strong>{label}</strong>
-                  <p>{detail}</p>
-                </button>
-              ))}
-            </div>
-          )}
-          {step === 2 && (
-            <>
-              <label>
-                Device identity
-                <input
-                  required
-                  pattern="[a-z0-9\-]{1,64}"
-                  value={form.device_id}
-                  onChange={(e) =>
-                    setForm({ ...form, device_id: e.target.value })
-                  }
-                />
-                <small>Lowercase letters, numbers, and hyphens.</small>
-              </label>
-              <label>
-                Live connector
-                <select
-                  value={form.connector}
-                  onChange={(e) =>
-                    setForm({ ...form, connector: e.target.value })
-                  }
-                >
-                  <option value="usb">USB serial gateway → MQTT</option>
-                  <option value="mqtt">Direct Wi-Fi → MQTT</option>
-                </select>
-              </label>
-              <div className="insight-note">
-                A separate simulated session is included. No hardware connection
-                is assumed.
-              </div>
-            </>
-          )}
-          {step === 3 && (
-            <>
-              {form.template === "generic" ? (
-                <div className="form-row">
-                  <label>
-                    Telemetry field
-                    <input
-                      required
-                      pattern="[a-z][a-z0-9_]{0,39}"
-                      value={form.mapping.field}
-                      onChange={(e) =>
-                        setForm({
-                          ...form,
-                          mapping: { ...form.mapping, field: e.target.value },
-                        })
-                      }
-                    />
-                  </label>
-                  <label>
-                    Unit
-                    <input
-                      required
-                      value={form.mapping.unit}
-                      maxLength={20}
-                      onChange={(e) =>
-                        setForm({
-                          ...form,
-                          mapping: { ...form.mapping, unit: e.target.value },
-                        })
-                      }
-                    />
-                  </label>
-                </div>
-              ) : form.template === "connectivity" ? (
-                <p>
-                  Configured fields: rf_adc_raw (counts), rf_detector_v (V),
-                  wifi_connected, wifi_rssi_dbm (dBm).
-                </p>
-              ) : (
-                <p>
-                  Configured field: {form.mapping.field} ({form.mapping.unit}).
-                  The Digital Twin will bind it to the template sensor.
-                </p>
-              )}
-              <div className="form-row">
-                <label>
-                  Sample interval (s)
-                  <input
-                    required
-                    type="number"
-                    min={1}
-                    max={600}
-                    value={form.interval_seconds}
-                    onChange={(e) =>
-                      setForm({
-                        ...form,
-                        interval_seconds: Number(e.target.value),
-                      })
-                    }
-                  />
-                </label>
-                <label>
-                  Stale after (s)
-                  <input
-                    required
-                    type="number"
-                    min={form.interval_seconds * 2}
-                    max={3600}
-                    value={form.freshness_seconds}
-                    onChange={(e) =>
-                      setForm({
-                        ...form,
-                        freshness_seconds: Number(e.target.value),
-                      })
-                    }
-                  />
-                </label>
-              </div>
-              <label>
-                High reading threshold (
-                {form.template === "connectivity" ? "V" : form.mapping.unit})
-                <input
-                  required
-                  type="number"
-                  step="any"
-                  value={form.high_limit}
-                  onChange={(e) =>
-                    setForm({ ...form, high_limit: Number(e.target.value) })
-                  }
-                />
-                <small>
-                  Creates an event after three consecutive readings above this
-                  limit.
-                </small>
-              </label>
-            </>
-          )}
-          {error && (
-            <div role="alert" className="error">
-              {error}
-            </div>
-          )}
-          <div className="form-actions">
-            {step > 0 && (
-              <button type="button" onClick={() => setStep(step - 1)}>
-                Back
-              </button>
-            )}
-            <button disabled={busy} className="primary" type="submit">
-              {busy ? "Creating…" : step === 3 ? "Create project" : "Continue"}
-              <ArrowRight size={16} />
-            </button>
-          </div>
-        </form>
-      </div>
-    </main>
-  );
-}
-function ProjectSettings({
-  project: p,
-  refresh,
-}: {
-  project: Project;
-  refresh: () => void;
-}) {
-  const [fresh, setFresh] = useState(p.freshness_seconds),
-    [limit, setLimit] = useState(p.high_limit),
-    [inserted, setInserted] = useState(p.attenuator_inserted),
-    [cable, setCable] = useState(p.cable_description),
-    [message, setMessage] = useState("");
-  const save = async (e: FormEvent) => {
-    e.preventDefault();
-    try {
-      await api(
-        "/projects/" + p.id + "/settings",
-        {
-          freshness_seconds: fresh,
-          high_limit: limit,
-          attenuator_inserted: inserted,
-          cable_description: cable,
-        },
-        "PUT",
-      );
-      setMessage("Settings saved");
-      refresh();
-    } catch (err) {
-      setMessage((err as Error).message);
-    }
-  };
-  return (
-    <div className="settings-content">
-      <h3>Device connection</h3>
-      <p>
-        Use these values when connecting hardware after the platform is ready.
-      </p>
-      <label>
-        Telemetry topic
-        <code>
-          agentwin/{p.id}/{p.device_id}/telemetry
-        </code>
-      </label>
-      <label>
-        Host gateway command
-        <code>
-          python -m gateway.serial_gateway --port COM3 --project {p.id} --device{" "}
-          {p.device_id}
-        </code>
-      </label>
-      <p>
-        Connector: {p.connector} · Sampling interval: {p.interval_seconds}s
-        (configure firmware to match).
-      </p>
-      <form onSubmit={save}>
-        <div className="form-row">
-          <label>
-            Freshness (s)
-            <input
-              type="number"
-              min={p.interval_seconds * 2}
-              max={3600}
-              value={fresh}
-              onChange={(e) => setFresh(Number(e.target.value))}
-            />
-          </label>
-          <label>
-            High limit
-            <input
-              type="number"
-              step="any"
-              value={limit}
-              onChange={(e) => setLimit(Number(e.target.value))}
-            />
-          </label>
-        </div>
-        {p.template === "connectivity" && (
-          <>
-            <label className="checkbox">
-              <input
-                type="checkbox"
-                checked={inserted}
-                onChange={(e) => setInserted(e.target.checked)}
-              />
-              10 dB attenuator physically inserted
-            </label>
-            <label>
-              Cable arrangement
-              <input
-                maxLength={300}
-                value={cable}
-                onChange={(e) => setCable(e.target.value)}
-              />
-            </label>
-            <p>
-              Calibration: unavailable. RF power remains unavailable until a
-              validated calibration workflow is added.
-            </p>
-          </>
-        )}
-        <button className="primary">Save settings</button>
-        <p role="status">{message}</p>
-      </form>
-    </div>
-  );
-}
 function GlobalEvents({ states }: { states: State[] }) {
   return (
     <main className="page">
@@ -1747,7 +833,7 @@ function GlobalEvents({ states }: { states: State[] }) {
           <div className="eyebrow">Evidence and recovery</div>
           <h1>Events across your systems.</h1>
           <p>
-            Latest simulated sessions. Open a project to inspect another source.
+            Events from the live LED hardware session.
           </p>
         </div>
       </div>

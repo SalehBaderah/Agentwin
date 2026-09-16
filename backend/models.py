@@ -21,7 +21,7 @@ class Mapping(Strict):
 
 class ProjectCreate(Strict):
     name: str = Field(min_length=1, max_length=100)
-    template: Literal['connectivity', 'generic', 'temperature', 'water'] = 'generic'
+    template: Literal['led'] = 'led'
     device_id: str = Field(default='sensor-01', pattern=r'^[a-z0-9-]{1,64}$')
     connector: Literal['usb', 'mqtt'] = 'usb'
     mapping: Mapping = Field(default_factory=Mapping)
@@ -36,13 +36,6 @@ class ProjectCreate(Strict):
         if self.freshness_seconds < self.interval_seconds * 2:
             raise ValueError('Freshness must be at least twice the sampling interval')
         return self
-
-class SessionCreate(Strict):
-    mode: Literal['live', 'simulated', 'replay']
-    recording_id: str | None = None
-
-class Scenario(Strict):
-    scenario: Literal['normal', 'level-change', 'pause', 'recovery', 'stop']
 
 class ComponentAction(Strict):
     component_id: str = Field(pattern=r'^[a-z0-9-]{1,64}$')

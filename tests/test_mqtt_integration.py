@@ -43,7 +43,7 @@ def test_serial_to_mqtt_to_websocket(tmp_path, monkeypatch):
                 assert app.state.runtime.mqtt_connected
                 time.sleep(1)
                 for i in range(4):
-                    payload={'schema_version':1,'project_id':'smart-connectivity','device_id':'uno-r4-01','boot_id':'synthetic-serial-fixture','sequence':i,'uptime_ms':i*1000,'readings':{'rf_adc_raw':980,'rf_detector_v':1.1966,'wifi_connected':None,'wifi_rssi_dbm':None}}
+                    payload={'schema_version':1,'project_id':'smart-connectivity','device_id':'uno-r4-01','boot_id':'serial-fixture','sequence':i,'uptime_ms':i*1000,'readings':{'led_on':False,'last_command_id':None}}
                     line=json.dumps(payload).encode()+b'\n'
                     # A partial frame must survive a serial read timeout.
                     connection.sendall(line[:40])
@@ -52,12 +52,12 @@ def test_serial_to_mqtt_to_websocket(tmp_path, monkeypatch):
                     time.sleep(.9)
                 sid=app.state.store.session('smart-connectivity',mode='live')['id']
                 state=client.get(f'/api/projects/smart-connectivity?session={sid}').json()
-                assert state['latest']['readings']['rf_detector_v']==1.1966
+                assert state['latest']['readings']['led_on'] is False
                 assert state['status']=='reporting'
                 assert state['gateway_status']=='online'
                 with client.websocket_connect(f'/api/ws?project=smart-connectivity&session={sid}') as ws:
                     snapshot=ws.receive_json()
-                    assert snapshot['state']['latest']['readings']['rf_adc_raw']==980
+                    assert snapshot['state']['latest']['readings']['led_on'] is False
                 # The fixture only populates the live connector's isolated test DB.
                 assert app.state.store.state('smart-connectivity')['latest'] is None
     finally:

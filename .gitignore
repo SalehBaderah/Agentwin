@@ -11,3 +11,6 @@ firmware/agentwin/secrets.h
 broker/passwords
 broker/acl
 *.tsbuildinfo
+.pytest-tmp
+*-live.log
+*-live.err.log

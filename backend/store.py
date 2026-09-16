@@ -55,36 +55,40 @@ class Store:
 
     def create_project(self, request: ProjectCreate, pid=None):
         pid = pid or 'project-' + uid()[:10]
-        p = {'id': pid, **request.model_dump(), 'arabic_title': 'اتصال الأنظمة الذكية' if request.template == 'connectivity' else None,
-             'description': "Monitor a connected device's availability alongside RF detector readings, and investigate changes using a project-specific AI agent." if request.template == 'connectivity' else 'A reusable sensor project with a dedicated operational view.',
+        p = {'id': pid, **request.model_dump(), 'name': 'UNO R4 LED', 'template': 'led',
+             'arabic_title': None, 'description': 'Live control and hardware-confirmed state for the external D7 LED.',
              'calibration': None, 'agent': {'version': 1, 'mode': 'observe', 'allowed_actions': ['acknowledge_event']},
-             'adc': {'resolution_bits': 12, 'reference_v': 5.0, 'reference': 'AR_DEFAULT (nominal; measure before calibration)'}, 'created': time.time()}
-        if p['template'] == 'temperature':
-            p['mapping'], p['high_limit'] = {'field': 'temperature_c', 'unit': '°C'}, request.high_limit
-            p['description'] = 'Monitor a temperature sensor in its physical context using shared project services.'
-        elif p['template'] == 'water':
-            p['mapping'], p['high_limit'] = {'field': 'water_level_cm', 'unit': 'cm'}, request.high_limit
-            p['description'] = 'Monitor a water level sensor associated with a tank or monitored area.'
+             'created': time.time()}
         p['graph'] = definition(p['template'], p['mapping'], p['attenuator_inserted'], p['cable_description'])
         self.execute('INSERT INTO projects VALUES (?,?)', (pid, json.dumps(p)))
         self.create_session(pid, 'live')
-        self.create_session(pid, 'simulated')
         return p
 
     def seed(self):
-        if not self.rows('SELECT id FROM projects WHERE id=?', ('smart-connectivity',)):
-            self.create_project(ProjectCreate(name='Smart Systems Connectivity', template='connectivity', device_id='uno-r4-01'), 'smart-connectivity')
-        if not self.rows('SELECT id FROM projects WHERE id=?', ('sensor-lab',)):
-            self.create_project(ProjectCreate(name='Sensor Lab', high_limit=30), 'sensor-lab')
+        row = self.rows('SELECT config FROM projects WHERE id=?', ('smart-connectivity',))
+        if not row:
+            self.create_project(ProjectCreate(name='UNO R4 LED', template='led', device_id='uno-r4-01'), 'smart-connectivity')
+        else:
+            project = json.loads(row[0]['config'])
+            replacing_old_graph = project.get('graph', {}).get('schema_version') != 4
+            project.update({'name': 'UNO R4 LED', 'template': 'led', 'device_id': 'uno-r4-01', 'connector': 'usb',
+                            'arabic_title': None, 'description': 'Live control and hardware-confirmed state for the external D7 LED.',
+                            'graph': definition()})
+            self.execute('UPDATE projects SET config=? WHERE id=?', (json.dumps(project), 'smart-connectivity'))
+            if replacing_old_graph:
+                for table in ('readings', 'boots', 'events', 'actions', 'conversations', 'gateways'):
+                    self.execute(f'DELETE FROM {table} WHERE project=?' if table != 'boots' else
+                                 "DELETE FROM boots WHERE session IN (SELECT id FROM sessions WHERE project=?)", ('smart-connectivity',))
+        self.execute("DELETE FROM projects WHERE id!='smart-connectivity'")
+        self.execute("DELETE FROM sessions WHERE project!='smart-connectivity' OR mode!='live'")
+        if not self.rows("SELECT id FROM sessions WHERE project='smart-connectivity' AND mode='live'"):
+            self.create_session('smart-connectivity', 'live')
 
     def create_session(self, pid, mode, recording=None):
         self.project(pid)
-        provenance = {'origin': 'hardware' if mode == 'live' else 'synthetic'}
-        if mode == 'replay':
-            source = self.session(pid, recording)
-            if source['mode'] == 'replay':
-                raise ValueError('Choose an original live or simulated recording')
-            provenance = {'origin': json.loads(source['provenance'])['origin'], 'recording_id': recording}
+        if mode != 'live':
+            raise ValueError('Only the live hardware session is available')
+        provenance = {'origin': 'hardware'}
         sid = uid()
         self.execute('INSERT INTO sessions VALUES (?,?,?,?,?,?)', (sid, pid, mode, json.dumps(provenance), time.time(), 'stop'))
         return self.session(pid, sid)
@@ -93,7 +97,7 @@ class Store:
         if sid:
             rows = self.rows('SELECT * FROM sessions WHERE project=? AND id=?', (pid, sid))
         else:
-            rows = self.rows('SELECT * FROM sessions WHERE project=? AND mode=? ORDER BY created DESC LIMIT 1', (pid, mode or 'simulated'))
+            rows = self.rows('SELECT * FROM sessions WHERE project=? AND mode=? ORDER BY created DESC LIMIT 1', (pid, mode or 'live'))
         if not rows:
             raise ValueError('Session not found in this project')
         return rows[0]
@@ -125,14 +129,6 @@ class Store:
                 raise ValueError(f'{key} must be numeric')
             if data_type == 'categorical' and type(value) is not str:
                 raise ValueError(f'{key} must be categorical text')
-        raw = values.get('rf_adc_raw')
-        if raw is not None and (raw != int(raw) or not 0 <= raw < 2 ** p['adc']['resolution_bits']):
-            raise ValueError('ADC count outside configured resolution')
-        voltage = values.get('rf_detector_v')
-        if voltage is not None and not 0 <= voltage <= p['adc']['reference_v']:
-            raise ValueError('Voltage outside reference range')
-        if values.get('wifi_rssi_dbm') is not None and not -150 <= values['wifi_rssi_dbm'] <= 0:
-            raise ValueError('Invalid Wi-Fi RSSI')
         now = time.time() if now is None else now
         with self.lock:
             last = self.rows('SELECT * FROM readings WHERE session=? ORDER BY id DESC LIMIT 1', (sid,))
@@ -142,9 +138,9 @@ class Store:
             if last and last[0]['boot'] == m.boot_id and (m.sequence <= last[0]['seq'] or m.uptime_ms < last[0]['uptime']):
                 return {'accepted': False, 'reason': 'duplicate or out of order'}
             # Unknown boot requires an early sample. No wall-clock claim from arbitrary uptime.
-            if s['mode'] != 'replay' and (not last or last[0]['boot'] != m.boot_id) and m.uptime_ms > 30000:
+            if (not last or last[0]['boot'] != m.boot_id) and m.uptime_ms > 30000:
                 return {'accepted': False, 'reason': 'new boot requires reconnect/restart within 30 seconds'}
-            if last and last[0]['boot'] == m.boot_id and s['mode'] != 'replay':
+            if last and last[0]['boot'] == m.boot_id:
                 first = self.rows('SELECT * FROM readings WHERE session=? AND boot=? ORDER BY id LIMIT 1', (sid, m.boot_id))[0]
                 age = now - first['received'] - (m.uptime_ms - first['uptime']) / 1000
                 if abs(age) > p['freshness_seconds']:
@@ -159,8 +155,13 @@ class Store:
                 return {'accepted': False, 'reason': 'duplicate'}
             self.evaluate(m.project_id, sid, now)
             command_id = values.get('last_command_id')
-            if command_id:
-                self.db.execute("UPDATE actions SET status='completed' WHERE id=? AND project=? AND session=? AND status='requested'", (command_id, m.project_id, sid))
+            led_on = values.get('led_on')
+            if command_id and type(led_on) is bool:
+                expected_action = f'set_led:{str(led_on).lower()}'
+                self.db.execute(
+                    "UPDATE actions SET status='completed' WHERE id=? AND project=? AND session=? AND target='led' AND action=? AND status='requested'",
+                    (command_id, m.project_id, sid, expected_action),
+                )
                 self.db.commit()
             return {'accepted': True, 'id': cur.lastrowid}
 
@@ -169,24 +170,16 @@ class Store:
         p = self.project(pid)
         h = self.history(pid, sid, 3)
         session = self.session(pid, sid)
-        if session['mode'] == 'replay':
-            return
         last = h[-1] if h else None
         baseline = last['received'] if last else session['created']
         stale = now - baseline > p['freshness_seconds']
-        field = p['graph']['primary_field']
-        limit = p['high_limit']
-        numeric_rule = p['graph']['fields'][field].get('data_type', 'number') == 'number'
-        consecutive = len(h) == 3 and len({r['boot'] for r in h}) == 1 and all(b['received'] - a['received'] <= p['freshness_seconds'] for a, b in zip(h, h[1:]))
-        high = numeric_rule and consecutive and all(r['readings'].get(field) is not None and r['readings'][field] > limit for r in h)
-        recovered_level = numeric_rule and consecutive and all(r['readings'].get(field) is not None and r['readings'][field] <= limit for r in h) and not stale
-        for kind, active, recovered in [('missing_telemetry', stale, not stale and bool(last)), ('high_reading', high and not stale, recovered_level)]:
+        for kind, active, recovered in [('missing_telemetry', stale, not stale and bool(last))]:
             open_rows = self.rows('SELECT * FROM events WHERE project=? AND session=? AND kind=? AND recovered IS NULL', (pid, sid, kind))
             if active and not open_rows:
                 recent = self.rows('SELECT recovered FROM events WHERE project=? AND session=? AND kind=? ORDER BY created DESC LIMIT 1', (pid, sid, kind))
                 if recent and recent[0]['recovered'] and now - recent[0]['recovered'] < 10:
                     continue
-                evidence = {'rule': f'No telemetry for > {p["freshness_seconds"]} seconds' if kind == 'missing_telemetry' else f'{field} > {limit} {p["graph"]["fields"][field]["unit"]} for 3 consecutive samples', 'readings': h, 'observed_at': now, 'source_mode': session['mode'], 'cause': 'Unknown; this observation does not establish interference or jamming.'}
+                evidence = {'rule': f'No telemetry for > {p["freshness_seconds"]} seconds', 'readings': h, 'observed_at': now, 'source_mode': session['mode'], 'cause': 'The live LED board stopped reporting; inspect USB, gateway, and board power.'}
                 self.db.execute('INSERT INTO events VALUES (?,?,?,?,?,?,?,?)', (uid(), pid, sid, kind, now, None, None, json.dumps(evidence)))
             elif recovered and open_rows:
                 self.db.execute('UPDATE events SET recovered=? WHERE project=? AND session=? AND kind=? AND recovered IS NULL', (now, pid, sid, kind))
@@ -204,7 +197,7 @@ class Store:
         stale = not last or time.time() - last['received'] > p['freshness_seconds']
         gateway = self.rows('SELECT * FROM gateways WHERE project=?', (pid,))
         gateway_status = 'unknown' if not gateway else ('online' if gateway[0]['online'] and time.time() - gateway[0]['received'] < 10 else 'disconnected')
-        return {'project': p, 'session': {**s, 'provenance': json.loads(s['provenance'])}, 'sessions': self.rows('SELECT * FROM sessions WHERE project=? ORDER BY created DESC', (pid,)), 'latest': last, 'readings': h, 'events': self.events(pid, s['id']), 'actions': self.rows('SELECT * FROM actions WHERE project=? AND session=? ORDER BY created DESC LIMIT 50', (pid, s['id'])), 'status': 'recording' if s['mode'] == 'replay' else ('awaiting data' if not last else 'stale' if stale else 'reporting'), 'gateway_status': gateway_status, 'estimated_rf_dbm': None, 'agent_config': p['agent']}
+        return {'project': p, 'session': {**s, 'provenance': json.loads(s['provenance'])}, 'sessions': [s], 'latest': last, 'readings': h, 'events': self.events(pid, s['id']), 'actions': self.rows('SELECT * FROM actions WHERE project=? AND session=? ORDER BY created DESC LIMIT 50', (pid, s['id'])), 'status': 'awaiting data' if not last else 'stale' if stale else 'reporting', 'gateway_status': gateway_status, 'agent_config': p['agent']}
 
     def acknowledge(self, pid, sid, eid):
         rows = self.rows('SELECT * FROM events WHERE id=? AND project=? AND session=?', (eid, pid, sid))

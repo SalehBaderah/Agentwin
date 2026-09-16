@@ -47,7 +47,7 @@ def run_tool(store, pid, sid, name, args):
     target = args.get('id')
     if name == 'get_project_state':
         s = store.state(pid, sid)
-        return {k: s[k] for k in ['project', 'session', 'latest', 'status', 'estimated_rf_dbm', 'gateway_status']}
+        return {k: s[k] for k in ['project', 'session', 'latest', 'status', 'gateway_status']}
     if name == 'get_recent_readings':
         return store.history(pid, sid, 30)
     if name == 'get_component_details':
