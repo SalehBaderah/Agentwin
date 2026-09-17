@@ -2,7 +2,7 @@
 
 **Every system. Its own agent.** A local IoT monitoring MVP with an Obsidian Plum React interface, persistent FastAPI backend, project-scoped agent tools, simulation, replay, MQTT ingestion, and a USB gateway.
 
-> For the current multi-project workflow, use the [operator guide](docs/operator-guide.md). It supersedes older single-LED UI descriptions in this README.
+> For the current multi-project workflow, architecture, and device onboarding process, use the [Platform Overview](docs/platform-overview.md).
 
 The first physical acceptance path controls an external LED on UNO R4 pin D7 through the live USB gateway and confirms the result through device telemetry. Simulation remains available as an explicitly selected test source. No physical test is claimed until the wiring procedure is performed.
 
@@ -31,7 +31,7 @@ Optional real-device broker:
 docker compose up -d broker
 ```
 
-Compose binds Mosquitto only to `127.0.0.1:1883`. The backend retries broker connection independently. Docker's engine was unavailable during this build; see the verification record for the exact integration tests performed. A native Mosquitto process is also supported. See [hardware integration](docs/hardware.md) for USB and private-network setup.
+Compose binds Mosquitto only to `127.0.0.1:1883`. The backend retries broker connection independently. A native Mosquitto process is also supported. See the [Platform Overview](docs/platform-overview.md) for architecture, firmware structure, wiring workflow, and new-project setup.
 
 ## What works
 
@@ -104,6 +104,6 @@ npm.cmd --prefix frontend run smoke
 .\.venv\Scripts\python.exe -m simulator.run --scenario recovery
 ```
 
-Browser tests create a verification project and simulated/replay histories in the running database. Use a separate `DATABASE_PATH` for test runs. See [verification](docs/verification.md), [three-minute demo](docs/demo.md), [hardware guide](docs/hardware.md), and [CI/CD backlog](docs/backlog.md).
+Browser tests create a verification project and simulated/replay histories in the running database. Use a separate `DATABASE_PATH` for test runs. See the [Platform Overview](docs/platform-overview.md) for architecture, firmware dependencies, physical acceptance boundaries, and future improvements.
 
 The optional serial/MQTT protocol test uses a local Aedes test fixture because Mosquitto/Docker was unavailable. Run it with `$env:RUN_MQTT_TESTS='1'` before pytest. Deployment remains configured for Mosquitto; passing this fixture does not certify broker ACLs or physical serial hardware.

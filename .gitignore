@@ -7,7 +7,7 @@ data/
 dist/
 .env
 artifacts/
-firmware/agentwin/secrets.h
+firmware/projects/*/secrets.h
 broker/passwords
 broker/acl
 *.tsbuildinfo

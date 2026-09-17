@@ -2398,6 +2398,36 @@ h1 {
   line-height: 1.6;
 }
 
+.project-id-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.project-id-line code {
+  padding: 5px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.project-id-line button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 28px;
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--muted);
+  background: transparent;
+}
+
 .eyebrow,
 .project-type {
   color: var(--muted);

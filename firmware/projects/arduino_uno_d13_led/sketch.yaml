@@ -1,0 +1,8 @@
+default_fqbn: arduino:avr:uno
+profiles:
+  uno:
+    fqbn: arduino:avr:uno
+    platforms:
+      - platform: arduino:avr
+    libraries:
+      - ArduinoJson (7.2.1)

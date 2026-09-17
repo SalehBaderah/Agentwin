@@ -13,6 +13,17 @@ from backend.models import Telemetry
 
 log = logging.getLogger('agentwin.gateway')
 
+SERIAL_COMMAND_CHUNK_BYTES = 16
+SERIAL_COMMAND_CHUNK_DELAY_SECONDS = 0.01
+
+def write_command(connection, command):
+    payload = ('CMD ' + command + '\n').encode('utf-8')
+    for offset in range(0, len(payload), SERIAL_COMMAND_CHUNK_BYTES):
+        connection.write(payload[offset:offset + SERIAL_COMMAND_CHUNK_BYTES])
+        connection.flush()
+        if offset + SERIAL_COMMAND_CHUNK_BYTES < len(payload):
+            time.sleep(SERIAL_COMMAND_CHUNK_DELAY_SECONDS)
+
 def validate_line(line, project, device):
     if len(line) > 8192:
         raise ValueError('Serial line too large')
@@ -61,6 +72,7 @@ def main():
             return
         try:
             commands.put_nowait(validate_command(msg.payload, args.project, args.device))
+            log.info('Accepted command from MQTT for %s', args.device)
         except (ValueError, json.JSONDecodeError, queue.Full):
             log.warning('Invalid or excess command rejected')
     client.on_connect = connected
@@ -73,35 +85,28 @@ def main():
                 with serial.serial_for_url(args.port, baudrate=args.baud, timeout=1) as connection:
                     connection.reset_input_buffer()
                     last_status = 0
-                    buffer = bytearray()
-                    dropping = False
                     while True:
                         try:
                             command = commands.get_nowait()
-                            connection.write(('CMD ' + command + '\n').encode('utf-8'))
-                            connection.flush()
+                            write_command(connection, command)
+                            log.info('Forwarded command to %s on %s', args.device, args.port)
                         except queue.Empty:
                             pass
                         if time.monotonic() - last_status > 3:
                             client.publish(topic+'/status', json.dumps({'online': True}), qos=0, retain=False)
                             last_status = time.monotonic()
-                        # Preserve partial lines over serial timeouts; bound malformed frames.
-                        for byte in connection.read(max(1, min(connection.in_waiting, 8192))):
-                            if byte == 10:
-                                if not dropping and buffer:
-                                    try:
-                                        payload = validate_line(bytes(buffer), args.project, args.device)
-                                        if client.is_connected():
-                                            client.publish(topic+'/telemetry', payload, qos=0, retain=False)
-                                    except ValueError:
-                                        log.warning('Invalid serial frame rejected')
-                                buffer.clear()
-                                dropping = False
-                            elif not dropping:
-                                buffer.append(byte)
-                                if len(buffer) > 8192:
-                                    dropping = True
-                                    buffer.clear()
+                        frame = connection.readline(8193)
+                        if not frame:
+                            continue
+                        if len(frame) > 8192 or not frame.endswith(b'\n'):
+                            log.warning('Incomplete or oversized serial frame rejected')
+                            continue
+                        try:
+                            payload = validate_line(frame.rstrip(b'\r\n'), args.project, args.device)
+                            if client.is_connected():
+                                client.publish(topic+'/telemetry', payload, qos=0, retain=False)
+                        except ValueError as error:
+                            log.warning('Invalid serial frame rejected: %s; frame=%r', error, frame[:240])
             except (serial.SerialException, OSError):
                 client.publish(topic+'/status', json.dumps({'online': False}), qos=0, retain=False)
                 log.warning('Serial unavailable; retrying in 3 seconds')
