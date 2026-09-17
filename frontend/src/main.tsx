@@ -29,6 +29,7 @@ import {
   Server,
   Plus,
   MessageSquare,
+  Menu,
   Send,
   Settings as SettingsIcon,
   ShieldCheck,
@@ -42,6 +43,7 @@ import {
   XAxis,
   YAxis,
   Tooltip,
+  CartesianGrid,
 } from "recharts";
 import type { Answer, Component, Event as ProjectEvent, Project, State } from "./types";
 import { api, display, strings, time } from "./types";
@@ -90,6 +92,7 @@ function App() {
     [connected, setConnected] = useState(false),
     [loaded, setLoaded] = useState(false),
     [error, setError] = useState("");
+  const [menuOpen, setMenuOpen] = useState(false);
   const refresh = useCallback(() => {
     api<State[]>("/projects")
       .then((s) => {
@@ -147,7 +150,8 @@ function App() {
           {strings.brand}
           <span className="version">MVP</span>
         </Link>
-        <nav>
+        <button className="menu-toggle" aria-label="Toggle navigation" aria-expanded={menuOpen} onClick={() => setMenuOpen(!menuOpen)}>{menuOpen ? <X size={19}/> : <Menu size={19}/>}</button>
+        <nav className={menuOpen ? "open" : ""} onClick={() => setMenuOpen(false)}>
           <NavLink to="/" end>
             <LayoutDashboard size={18} />
             {strings.overview}
@@ -291,6 +295,7 @@ function Overview({
               icon={<Bell />}
             />
           </div>
+          {states.length > 0 && <PlatformAnalytics states={states} />}
         </>
       )}
       <div className="section-heading">
@@ -392,7 +397,7 @@ function Overview({
             <div>
               <strong>No open events in these sessions</strong>
               <p>
-                Connect the UNO R4 and USB gateway to receive live LED telemetry.
+                Connect a configured device to receive live telemetry and operational evidence.
               </p>
             </div>
           </div>
@@ -406,6 +411,22 @@ function Overview({
       </footer>
     </main>
   );
+}
+function PlatformAnalytics({ states }: { states: State[] }) {
+  const [projectId, setProjectId] = useState(states[0]?.project.id || "");
+  const [metricKey, setMetricKey] = useState("");
+  const [windowSize, setWindowSize] = useState("30");
+  const selected = states.find((state) => state.project.id === projectId) || states[0];
+  if (!selected) return null;
+  const field = selected.project.graph.fields[metricKey] ? metricKey : selected.project.graph.primary_field;
+  const metric = selected.project.graph.fields[field];
+  const numeric = metric.data_type === "number";
+  const limit = windowSize === "all" ? selected.readings.length : Number(windowSize);
+  const rows = selected.readings.slice(-limit).map((reading) => ({ received: reading.received, value: reading.readings[field] }));
+  const reporting = states.flatMap((state) => state.devices).filter((device) => device.reporting).length;
+  const devices = states.flatMap((state) => state.devices).length;
+  const pending = states.flatMap((state) => state.actions).filter((action) => action.status === "requested").length;
+  return <section className="analytics-grid"><div className="panel analytics-primary"><div className="panel-heading"><div><h2>Telemetry history</h2><p>Stored observations only; missing samples remain gaps.</p></div><div className="compact-filters"><label>Project<select value={selected.project.id} onChange={(event) => { setProjectId(event.target.value); setMetricKey(""); }}><option value={selected.project.id}>{selected.project.name}</option>{states.filter((state) => state.project.id !== selected.project.id).map((state) => <option value={state.project.id} key={state.project.id}>{state.project.name}</option>)}</select></label><label>Metric<select value={field} onChange={(event) => setMetricKey(event.target.value)}>{Object.entries(selected.project.graph.fields).map(([key, item]) => <option value={key} key={key}>{item.label}</option>)}</select></label><label>Window<select value={windowSize} onChange={(event) => setWindowSize(event.target.value)}><option value="30">Latest 30</option><option value="90">Latest 90</option><option value="all">All stored</option></select></label></div></div>{numeric && rows.length ? <div className="overview-chart"><ResponsiveContainer width="100%" height="100%"><LineChart data={rows}><CartesianGrid vertical={false} stroke="rgba(225,201,232,.07)"/><XAxis dataKey="received" tickFormatter={(value) => time(Number(value))} minTickGap={40}/><YAxis width={48} unit={metric.unit}/><Tooltip labelFormatter={(value) => time(Number(value))} formatter={(value) => [`${display(value)} ${metric.unit}`, metric.label]}/><Line dataKey="value" stroke="#d0a7dc" strokeWidth={2} dot={false} connectNulls={false}/></LineChart></ResponsiveContainer></div> : <div className="chart-empty"><Activity/><strong>{rows.length ? "This metric is discrete" : "No readings yet"}</strong><p>{rows.length ? "Open the project to inspect state transitions." : "The chart will appear after the selected project reports numeric telemetry."}</p></div>}</div><aside className="panel operations-panel"><div className="panel-heading"><div><h2>Operational status</h2><p>Across configured projects.</p></div></div><div className="operation-count"><strong>{reporting}/{devices}</strong><span>devices reporting</span></div><div className="status-breakdown"><div><span><i className="status-dot good"/>Reporting</span><b>{reporting}</b></div><div><span><i className="status-dot"/>Unavailable</span><b>{devices-reporting}</b></div><div><span><i className="status-dot pending"/>Pending actions</span><b>{pending}</b></div></div><Link className="button tertiary" to="/events">Review operational events <ArrowRight size={15}/></Link></aside></section>;
 }
 function Stat({
   label,
@@ -487,6 +508,11 @@ function Workspace({ connected }: { connected: boolean }) {
       </main>
     );
   const p = state.project;
+  const removeProject = async () => {
+    if (!window.confirm(`Delete ${p.name} and all of its stored sessions, readings, events, and actions?`)) return;
+    try { await api(`/projects/${p.id}`, {}, "DELETE"); navigate("/projects"); }
+    catch (failure) { setError((failure as Error).message); }
+  };
   return (
     <main className="page project-page">
       <Link className="back" to="/projects">
@@ -591,11 +617,6 @@ function Workspace({ connected }: { connected: boolean }) {
 
 function ProjectOverview({ state }: { state: State }) {
   const p = state.project;
-  const removeProject = async () => {
-    if (!window.confirm(`Delete ${p.name} and all of its stored sessions, readings, events, and actions?`)) return;
-    try { await api(`/projects/${p.id}`, {}, "DELETE"); navigate("/projects"); }
-    catch (failure) { setError((failure as Error).message); }
-  };
   return <div className="project-overview"><div className="stats">{Object.entries(p.graph.fields).map(([key, field]) => <Stat key={key} label={field.label} value={<>{display(state.latest?.readings[key])}<em>{field.unit}</em></>} hint={state.latest ? `Received ${time(state.latest.received)}` : "No reported value"} icon={<Activity />}/>)}</div><div className="overview-split"><section className="panel"><h3>Devices</h3>{state.devices.map((device) => <div className="detail-relation" key={device.id}><span>{device.id} · {device.connector}</span><strong>{device.reporting ? "reporting" : device.online ? "connected" : "unavailable"}</strong></div>)}</section><section className="panel"><h3>Recent actions</h3>{state.actions.length ? state.actions.slice(0, 5).map((action) => <div className="detail-relation" key={action.id}><span>{action.action.replace(":", " ")}</span><strong>{action.status.replace("_", " ")}</strong></div>) : <p className="detail-empty">No commands have been requested.</p>}</section></div><AgentPanel state={state}/></div>;
 }
 
@@ -610,7 +631,7 @@ function ControlsPanel({ state, refresh }: { state: State; refresh: () => void }
   const [message, setMessage] = useState("");
   const controls = state.project.graph.components.flatMap((component) => (component.controls || []).map((control) => ({ component, control })));
   const run = async (component: Component, action: string, value: boolean) => { try { const result = await api<{ id: string; status: string }>(`/projects/${state.project.id}/sessions/${state.session.id}/actions`, { component_id: component.id, action, value }); setMessage(`Action ${result.id.slice(0, 8)} is ${result.status}. It completes only after matching telemetry.`); refresh(); } catch (error) { setMessage((error as Error).message); } };
-  return <div className="controls-view"><h3>Hardware controls</h3><p>Only capabilities declared by this project’s device configuration appear here.</p>{controls.length ? controls.map(({ component, control }) => <section className="panel" key={`${component.id}-${control.action}`}><h4>{component.name}</h4><p>{control.label}. Expected reported field: {control.expected.field}.</p><div className="component-actions"><button disabled={!controlReady(state, state.project, control)} onClick={() => run(component, control.action, true)}>Enable</button><button disabled={!controlReady(state, state.project, control)} onClick={() => run(component, control.action, false)}>Disable</button></div>{!controlReady(state, state.project, control) && <p className="detail-empty">The configured device transport must be live before control is available.</p>}</section>) : <div className="empty"><ShieldCheck/><h3>No hardware controls configured</h3><p>This project is read-only until a device capability and verification contract are registered.</p></div>}<p role="status">{message}</p></div>;
+  return <div className="controls-view"><div className="view-heading"><div><h3>Hardware controls</h3><p>Commands remain pending until the target device reports the expected state.</p></div></div>{controls.length ? controls.map(({ component, control }) => { const latestAction = state.actions.find((action) => action.target === component.id); const current = state.latest?.readings[control.expected.field]; const ready = controlReady(state, state.project, control); return <section className="panel control-card" key={`${component.id}-${control.action}`}><div className="control-heading"><div><h4>{component.name}</h4><p>{control.label}</p></div><Badge tone={latestAction?.status === "completed" ? "success" : latestAction?.status === "requested" ? "warning" : ""}>{latestAction?.status?.replace("_", " ") || "ready"}</Badge></div><div className="control-state"><span>Reported state<strong>{metricValue(current, 0)}</strong></span><span>Verification field<strong>{control.expected.field}</strong></span><span>Last request<strong>{latestAction ? latestAction.action.replace(":", " ") : "None"}</strong></span></div><div className="component-actions"><button className="primary" disabled={!ready || latestAction?.status === "requested"} onClick={() => run(component, control.action, true)}>Turn on</button><button className="secondary-button" disabled={!ready || latestAction?.status === "requested"} onClick={() => run(component, control.action, false)}>Turn off</button></div>{latestAction?.status === "requested" && <p className="verification-note"><Activity size={14}/> Waiting for matching device telemetry. The reported state has not been confirmed yet.</p>}{!ready && <p className="detail-empty">Connect the configured live transport before controlling this component.</p>}</section>; }) : <div className="empty"><ShieldCheck/><h3>No hardware controls configured</h3><p>This project is read-only until a device capability and verification contract are registered.</p></div>}<p role="status">{message}</p></div>;
 }
 
 function AgentPanel({ state }: { state: State }) {
@@ -621,10 +642,26 @@ function AgentPanel({ state }: { state: State }) {
 
 function AddProject() {
   type AddedDevice = { device_id: string; connector: "usb" | "mqtt"; serial_port: string };
-  const navigate = useNavigate(); const [form, setForm] = useState({ name: "", template: "generic", device_id: "device-01", connector: "usb", serial_port: "", field: "sensor_value", unit: "value", freshness_seconds: 8 }); const [devices, setDevices] = useState<AddedDevice[]>([]); const [message, setMessage] = useState("");
-  const save = async (event: React.FormEvent) => { event.preventDefault(); const { field, unit, ...payload } = form; try { const project = await api<Project>("/projects", { ...payload, serial_port: form.serial_port || null, freshness_seconds: Number(form.freshness_seconds), interval_seconds: 1, mapping: { field, unit } }); await Promise.all(devices.map((device) => api(`/projects/${project.id}/devices`, { ...device, serial_port: device.serial_port || null }))); navigate(`/projects/${project.id}`); } catch (error) { setMessage((error as Error).message); } };
+  const steps = ["Name", "Devices", "Telemetry", "Review"];
+  const navigate = useNavigate();
+  const [step, setStep] = useState(0);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({ name: "", template: "generic", device_id: "device-01", connector: "usb", serial_port: "", field: "sensor_value", unit: "value", freshness_seconds: 8 });
+  const [devices, setDevices] = useState<AddedDevice[]>([]);
+  const [message, setMessage] = useState("");
+  const save = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (step < steps.length - 1) { setStep(step + 1); return; }
+    const { field, unit, ...payload } = form;
+    setSaving(true); setMessage("");
+    try {
+      const project = await api<Project>("/projects", { ...payload, serial_port: form.serial_port || null, freshness_seconds: Number(form.freshness_seconds), interval_seconds: 1, mapping: { field, unit } });
+      await Promise.all(devices.map((device) => api(`/projects/${project.id}/devices`, { ...device, serial_port: device.serial_port || null })));
+      navigate(`/projects/${project.id}`);
+    } catch (error) { setMessage((error as Error).message); setSaving(false); }
+  };
   const updateDevice = (index: number, patch: Partial<AddedDevice>) => setDevices(devices.map((device, current) => current === index ? { ...device, ...patch } : device));
-  return <main className="page"><div className="page-heading"><div><h1>Add a project</h1><p>Name, template, device, connector, mapping, and freshness are saved together.</p></div></div><form className="panel onboarding" onSubmit={save}><label>Project name<input required value={form.name} onChange={(event) => setForm({...form, name: event.target.value})}/></label><label>Template<select value={form.template} onChange={(event) => setForm({...form, template: event.target.value})}><option value="led">LED or digital output</option><option value="temperature">Temperature monitoring</option><option value="water">Water level monitoring</option><option value="connectivity">Connectivity/RF monitoring</option><option value="generic">Generic sensor</option></select></label><label>Device identity<input required value={form.device_id} onChange={(event) => setForm({...form, device_id: event.target.value})}/></label><label>Connector<select value={form.connector} onChange={(event) => setForm({...form, connector: event.target.value})}><option value="usb">USB serial gateway</option><option value="mqtt">Direct Wi-Fi MQTT</option></select></label>{form.connector === "usb" && <label>Serial port<input placeholder="COM5" value={form.serial_port} onChange={(event) => setForm({...form, serial_port: event.target.value})}/></label>}<fieldset><legend>Additional devices</legend><p>Each device is scoped to this project and may use a different connector.</p>{devices.map((device, index) => <div className="extra-device" key={index}><label>Device identity<input required value={device.device_id} onChange={(event) => updateDevice(index, {device_id: event.target.value})}/></label><label>Connector<select value={device.connector} onChange={(event) => updateDevice(index, {connector: event.target.value as AddedDevice["connector"]})}><option value="usb">USB serial gateway</option><option value="mqtt">Direct Wi-Fi MQTT</option></select></label>{device.connector === "usb" && <label>Serial port<input placeholder="COM9" value={device.serial_port} onChange={(event) => updateDevice(index, {serial_port: event.target.value})}/></label>}<button type="button" onClick={() => setDevices(devices.filter((_, current) => current !== index))}>Remove</button></div>)}<button type="button" onClick={() => setDevices([...devices, {device_id: `device-${devices.length + 2}`, connector: "usb", serial_port: ""}])}>Add device</button></fieldset><label>Telemetry field<input required value={form.field} onChange={(event) => setForm({...form, field: event.target.value})}/></label><label>Unit<input required value={form.unit} onChange={(event) => setForm({...form, unit: event.target.value})}/></label><label>Freshness seconds<input type="number" min="3" value={form.freshness_seconds} onChange={(event) => setForm({...form, freshness_seconds: Number(event.target.value)})}/></label><button className="primary">Save project</button><p role="status">{message}</p></form></main>;
+  return <main className="page onboarding-page"><div className="page-heading"><div><h1>Add a project</h1><p>Define the system once. Device identity, telemetry, Twin, and history stay scoped to it.</p></div></div><ol className="stepper" aria-label="Project setup progress">{steps.map((label, index) => <li className={index === step ? "active" : index < step ? "complete" : ""} key={label}><span>{index < step ? <Check size={14}/> : index + 1}</span>{label}</li>)}</ol><form className="panel onboarding" onSubmit={save}>{step === 0 && <div className="form-step"><div className="form-step-heading"><h2>Name the system</h2><p>Choose a reusable starting structure. Nothing is created until the final step.</p></div><label>Project name<input required autoFocus value={form.name} placeholder="North tank" onChange={(event) => setForm({...form, name: event.target.value})}/><small>Use the name operators recognize.</small></label><label>Template<select value={form.template} onChange={(event) => setForm({...form, template: event.target.value})}><option value="generic">Generic sensor</option><option value="led">LED or digital output</option><option value="temperature">Temperature monitoring</option><option value="water">Water level monitoring</option><option value="connectivity">Connectivity/RF monitoring</option></select><small>Templates define fields, components, and available controls.</small></label></div>}{step === 1 && <div className="form-step"><div className="form-step-heading"><h2>Register devices</h2><p>Identifiers must match the firmware or serial gateway exactly.</p></div><div className="device-form"><label>Primary device identity<input required autoFocus value={form.device_id} onChange={(event) => setForm({...form, device_id: event.target.value})}/></label><label>Connector<select value={form.connector} onChange={(event) => setForm({...form, connector: event.target.value})}><option value="usb">USB serial gateway</option><option value="mqtt">Direct Wi-Fi MQTT</option></select></label>{form.connector === "usb" && <label>Serial port<input placeholder="COM5" value={form.serial_port} onChange={(event) => setForm({...form, serial_port: event.target.value})}/></label>}</div>{devices.map((device, index) => <div className="extra-device" key={index}><label>Device identity<input required value={device.device_id} onChange={(event) => updateDevice(index, {device_id: event.target.value})}/></label><label>Connector<select value={device.connector} onChange={(event) => updateDevice(index, {connector: event.target.value as AddedDevice["connector"]})}><option value="usb">USB serial gateway</option><option value="mqtt">Direct Wi-Fi MQTT</option></select></label>{device.connector === "usb" && <label>Serial port<input placeholder="COM9" value={device.serial_port} onChange={(event) => updateDevice(index, {serial_port: event.target.value})}/></label>}<button className="tertiary" type="button" onClick={() => setDevices(devices.filter((_, current) => current !== index))}>Remove</button></div>)}<button className="secondary-button" type="button" onClick={() => setDevices([...devices, {device_id: `device-${devices.length + 2}`, connector: "usb", serial_port: ""}])}><Plus size={15}/> Add device</button></div>}{step === 2 && <div className="form-step"><div className="form-step-heading"><h2>Define telemetry</h2><p>Built-in templates use fixed field contracts. Generic projects use your field and unit.</p></div>{form.template === "generic" ? <div className="mapping-fields"><label>Telemetry field<input required autoFocus value={form.field} onChange={(event) => setForm({...form, field: event.target.value})}/><small>Lowercase JSON key, for example humidity.</small></label><label>Unit<input required value={form.unit} onChange={(event) => setForm({...form, unit: event.target.value})}/></label></div> : <div className="preset-note"><ShieldCheck/><div><strong>Template-managed fields</strong><p>The {form.template.replaceAll("_", " ")} template supplies its telemetry field names and units.</p></div></div>}<label>Freshness threshold<input type="number" min="3" value={form.freshness_seconds} onChange={(event) => setForm({...form, freshness_seconds: Number(event.target.value)})}/><small>Agentwin marks data stale after this many seconds without a sample.</small></label></div>}{step === 3 && <div className="form-step"><div className="form-step-heading"><h2>Review configuration</h2><p>Confirm the operational identity before creating the project.</p></div><dl className="config-summary"><div><dt>Project</dt><dd>{form.name}</dd></div><div><dt>Template</dt><dd>{form.template.replaceAll("_", " ")}</dd></div><div><dt>Devices</dt><dd>{1 + devices.length}</dd></div><div><dt>Primary transport</dt><dd>{form.connector === "usb" ? `${form.connector}${form.serial_port ? ` on ${form.serial_port}` : ""}` : "Wi-Fi MQTT"}</dd></div><div><dt>Freshness</dt><dd>{form.freshness_seconds} seconds</dd></div>{form.template === "generic" && <div><dt>Mapping</dt><dd>{form.field} ({form.unit})</dd></div>}</dl></div>}<div className="form-actions">{step > 0 && <button className="tertiary" type="button" onClick={() => setStep(step - 1)}>Back</button>}<button className="primary" disabled={saving}>{step === steps.length - 1 ? saving ? "Creating project…" : "Create project" : "Continue"}</button></div><p role="status">{message}</p></form></main>;
 }
 const componentRegistry: Record<string, { icon: typeof Box; label: string; accent: string }> = {
   controller: { icon: Zap, label: "Controller", accent: "#AFC6E9" },
