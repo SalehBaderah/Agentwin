@@ -133,6 +133,7 @@ export async function api<T>(
         : "Check your configuration and try again.",
     );
   }
+  if (response.status === 204) return undefined as T;
   return response.json();
 }
 export const time = (value: number | null | undefined) =>

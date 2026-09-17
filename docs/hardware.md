@@ -19,20 +19,21 @@ The resistor may be placed on either side of the LED as long as it remains in se
 
 ### Upload and run
 
-1. In Arduino IDE, install the **Arduino UNO R4 Boards** package and select **Arduino UNO R4 WiFi** plus the board's COM port.
-2. Open `firmware/agentwin/agentwin.ino`. Keep `USE_WIFI_MQTT 0`, `PROJECT_ID "smart-connectivity"`, `DEVICE_ID "uno-r4-01"`, and `LED_PIN 7`.
-3. Compile and upload. Close Serial Monitor afterward; only one program can own the serial port.
-4. Start the local broker: `docker compose up -d broker`. If Docker is unavailable, start a native Mosquitto listener on `127.0.0.1:1883` using `broker/mosquitto.conf`.
-5. Start Agentwin: `.\.venv\Scripts\python.exe -m uvicorn backend.main:app --host 127.0.0.1 --port 8000`.
-6. Replace `COM3` with the port shown in Arduino IDE and start the gateway in another terminal:
+1. Start Agentwin: `.\.venv\Scripts\python.exe -m uvicorn backend.main:app --host 127.0.0.1 --port 8000`.
+2. In the web app, create an **LED or digital output** project. Set device identity to `uno-r4-01`, choose USB, enter the actual COM port, save, and note the generated project ID from the URL.
+3. In Arduino IDE, install the **Arduino UNO R4 Boards** package and select **Arduino UNO R4 WiFi** plus the board's COM port.
+4. Open `firmware/agentwin/agentwin.ino`. Keep `USE_WIFI_MQTT 0` and `LED_PIN 7`; replace `PROJECT_ID` with the generated project ID and keep `DEVICE_ID` equal to the identity saved in Agentwin.
+5. Compile and upload. Close Serial Monitor afterward; only one program can own the serial port.
+6. Start the local broker: `docker compose up -d broker`. If Docker is unavailable, start a native Mosquitto listener on `127.0.0.1:1883` using `broker/mosquitto.conf`.
+7. Replace the placeholders and COM port below with the values saved in Agentwin, then start the gateway in another terminal:
 
    ```powershell
-   .\.venv\Scripts\python.exe -m gateway.serial_gateway --port COM3 --project smart-connectivity --device uno-r4-01
+   .\.venv\Scripts\python.exe -m gateway.serial_gateway --port YOUR_COM_PORT --project YOUR_PROJECT_ID --device YOUR_DEVICE_ID
    ```
 
-7. Press RESET on the UNO after the gateway opens. Agentwin accepts a new boot only when its first sample arrives within 30 seconds.
-8. Open `http://127.0.0.1:8000/projects/smart-connectivity?tab=twin`. Confirm the source is **live**, the gateway becomes **online**, and Test LED reports **Off**.
-9. Select **Test LED**, then choose **Turn LED on**. The action first shows **requested**. It changes to **completed** only after the board reports `led_on: true` with the matching command ID. Repeat with **Turn LED off**.
+8. Press RESET on the UNO after the gateway opens. Agentwin accepts a new boot only when its first sample arrives within 30 seconds.
+9. Open the created project's **Digital twin**. Confirm the source is **live**, the gateway becomes **online**, and the external LED reports **Off**.
+10. Select **External LED**, then choose **Turn on**. The action first shows **requested**. It changes to **completed** only after the board reports `led_on: true` with the matching command ID. Repeat with **Turn off**.
 
 If the button is disabled, verify that the selected session is live, Settings reports MQTT connected, and the USB gateway is online. If an action remains requested, check the gateway terminal, confirm Serial Monitor is closed, press RESET, and retry. A requested action is not proof that the LED changed.
 

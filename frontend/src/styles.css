@@ -71,6 +71,8 @@ button:disabled {
 .primary:hover {
   background: #e0c0e9 !important;
 }
+.danger { color: #f2a8b4; border-color: rgba(242, 168, 180, 0.3); background: transparent; }
+.project-actions { display: flex; gap: 10px; align-items: end; flex-wrap: wrap; }
 :focus-visible {
   outline: 2px solid #e2b8f0;
 }

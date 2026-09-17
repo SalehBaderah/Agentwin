@@ -5,6 +5,7 @@ fs.mkdirSync(output, { recursive: true });
 const browser = await chromium.launch({ channel: "msedge", headless: true });
 const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
 const errors = [];
+let createdId = "";
 page.on("pageerror", (error) => errors.push(error.message));
 const base = "http://127.0.0.1:8000";
 const check = (condition, message) => { if (!condition) throw Error(message); };
@@ -22,6 +23,7 @@ try {
   await page.getByLabel("Serial port").fill("COM8");
   await page.getByRole("button", { name: "Save project" }).click();
   await page.getByRole("heading", { name: "Browser temperature" }).waitFor();
+  createdId = new URL(page.url()).pathname.split("/").filter(Boolean).at(-1) || "";
   await page.getByRole("tab", { name: "Overview" }).click();
   await page.getByRole("heading", { name: "Devices", exact: true }).waitFor();
   await page.getByText("browser-temp-02 · usb").waitFor();
@@ -31,11 +33,14 @@ try {
   await page.getByLabel("Selected component details").waitFor();
   await page.screenshot({ path: output + "/platform-laptop.png", fullPage: true });
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto(base + "/projects/smart-connectivity");
+  await page.goto(base + "/projects/" + createdId);
   await page.getByRole("tab", { name: "Digital twin" }).click();
   await check(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "Horizontal overflow on mobile Twin");
   await page.screenshot({ path: output + "/platform-mobile.png", fullPage: true });
   await check(errors.length === 0, `Browser errors: ${errors.join("\n")}`);
   fs.writeFileSync(output + "/browser-results.json", JSON.stringify({ passed: true, flows: ["project onboarding", "project views", "component selection", "mobile layout"], errors }, null, 2));
   console.log("Platform browser smoke passed");
-} finally { await browser.close(); }
+} finally {
+  if (createdId) await page.request.delete(base + "/api/projects/" + createdId);
+  await browser.close();
+}

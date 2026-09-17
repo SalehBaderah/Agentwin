@@ -1,6 +1,6 @@
 # Agentwin operator guide
 
-This guide describes the current multi-project platform. The earlier LED report is historical; its UNO R4 LED circuit remains the first physical showcase.
+This guide describes the current multi-project platform. A fresh installation starts with no projects; every project is created by its operator. The earlier LED report is historical and its UNO R4 LED circuit remains an optional physical showcase.
 
 ## Run the web app on Windows
 
@@ -88,22 +88,22 @@ Telemetry must use this envelope and only include fields declared by that projec
 For a USB device, start one gateway per serial port after the broker and web app are running:
 
 ```powershell
-.\.venv\Scripts\python.exe -m gateway.serial_gateway --port COM5 --project smart-connectivity --device uno-r4-01
+.\.venv\Scripts\python.exe -m gateway.serial_gateway --port COM5 --project YOUR_PROJECT_ID --device uno-r4-01
 ```
 
 Replace all three values with the device's saved configuration. Close Arduino Serial Monitor before starting the gateway because only one program can own the serial port.
 
 For direct UNO R4 Wi-Fi MQTT, copy `firmware/agentwin/secrets.example.h` to `firmware/agentwin/secrets.h`, enter private-network broker credentials, set `USE_WIFI_MQTT` to `1`, and upload `firmware/agentwin/agentwin.ino`. Its MQTT transport is implemented but still requires physical broker and board verification.
 
-## Control the LED showcase
+## Create and control the LED showcase
 
-The saved LED project is `smart-connectivity` with device `uno-r4-01`, USB connector `COM5`, and D7 output. Wire and upload it as described in [hardware.md](hardware.md), then start the broker, web app, and USB gateway.
+Create an **LED or digital output** project with device `uno-r4-01`, USB connector `COM5`, and D7 output. Note the generated project ID and set the firmware `PROJECT_ID` to that value. Wire and upload it as described in [hardware.md](hardware.md), then start the broker, web app, and USB gateway with the generated project ID.
 
-Open **UNO R4 LED** and select **Controls**, or select **External LED** in the Twin. The control remains disabled until the live USB gateway reports online. **Enable** or **Disable** creates a `requested` action. It becomes `completed` only when the same device reports both the matching `last_command_id` and the requested `led_on` value. A button click or MQTT publish alone is not proof that the LED changed.
+Open the LED project and select **Controls**, or select **External LED** in the Twin. The control remains disabled until the live USB gateway reports online. **Enable** or **Disable** creates a `requested` action. It becomes `completed` only when the same device reports both the matching `last_command_id` and the requested `led_on` value. A button click or MQTT publish alone is not proof that the LED changed.
 
 ## What changed
 
-- The application no longer resets to a single hard-coded LED project on startup.
+- A new database starts empty and the application never creates hard-coded projects on startup.
 - Projects, device registrations, Twin definitions, sessions, readings, events, actions, and conversations persist independently in SQLite.
 - Templates now cover LED output, temperature, water level, connectivity/RF, and generic sensors.
 - USB serial and direct Wi-Fi MQTT use the same scoped topic and telemetry contract.

@@ -14,7 +14,7 @@ Final combined backend run: **13 passed** (12 regression tests + 1 serial/MQTT i
 | Offline assets | Interface fonts are bundled locally. Monitoring/simulation do not need an external font service, broker or LLM key. |
 | Original documents | Build prompt and both IDRAK reference Markdown files preserved. Updated naming/showcase decisions recorded in README. |
 
-Screenshots and `browser-results.json` are in ignored `artifacts/`. Browser smoke creates a test project and readings in the selected running database; use an isolated DATABASE_PATH for repeated CI runs. Unit/integration tests automatically create unique scratch databases under artifacts.
+Screenshots and `browser-results.json` are in ignored `artifacts/`. Browser smoke creates a temporary project and removes it in cleanup; use an isolated `DATABASE_PATH` in CI so an interrupted browser process cannot touch operator data. Unit and integration tests use temporary databases.
 
 Run all backend tests including the protocol fixture:
 

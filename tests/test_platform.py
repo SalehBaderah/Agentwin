@@ -11,7 +11,10 @@ from gateway.serial_gateway import validate_command, validate_line
 
 @pytest.fixture
 def store(tmp_path):
-    value = Store(str(tmp_path/'test.db')); value.seed(); yield value; value.db.close()
+    value = Store(str(tmp_path/'test.db'))
+    value.create_project(ProjectCreate(name='Test LED', template='led', device_id='uno-r4-01', connector='usb', serial_port='COM5'), 'smart-connectivity')
+    yield value
+    value.db.close()
 
 def packet(project, sequence=0, boot='boot-1', readings=None):
     return {'schema_version': 1, 'project_id': project['id'], 'device_id': project['device_id'], 'boot_id': boot, 'sequence': sequence, 'uptime_ms': sequence * 1000, 'readings': readings or {project['graph']['primary_field']: 24.0}}
@@ -26,7 +29,7 @@ def test_multiple_projects_persist_and_ingest_independently(store):
     assert store.ingest(packet(temperature, readings={'temperature_c': 22.5}), temp_live)['accepted']
     assert store.state(led['id'], led_live)['latest']['readings']['led_on'] is False
     assert store.state(temperature['id'], temp_live)['latest']['readings']['temperature_c'] == 22.5
-    reopened = Store(store.rows('PRAGMA database_list')[0]['file']); reopened.seed()
+    reopened = Store(store.rows('PRAGMA database_list')[0]['file'])
     assert {project['id'] for project in reopened.projects()} >= {led['id'], temperature['id']}; reopened.db.close()
 
 def test_templates_bind_project_specific_fields():
@@ -64,6 +67,7 @@ def test_commands_and_telemetry_are_scoped(store):
 def test_http_onboarding_and_project_sessions(tmp_path):
     app = create_app(str(tmp_path/'http.db'), background=False)
     with TestClient(app) as client:
+        assert client.get('/api/projects').json() == []
         created = client.post('/api/projects', json={'name': 'Water tank', 'template': 'water', 'device_id': 'tank-01', 'connector': 'mqtt', 'mapping': {'field': 'ignored', 'unit': 'ignored'}})
         assert created.status_code == 201
         pid = created.json()['id']; state = client.get(f'/api/projects/{pid}').json()
@@ -73,4 +77,6 @@ def test_http_onboarding_and_project_sessions(tmp_path):
         assert {device['id'] for device in added.json()['devices']} == {'tank-01', 'tank-02'}
         simulated = client.post(f'/api/projects/{pid}/sessions', json={'mode': 'simulated'})
         assert simulated.status_code == 201
-        assert client.get('/api/projects').json()[0]['project']['id'] == 'smart-connectivity'
+        assert client.get('/api/projects').json()[0]['project']['id'] == pid
+        assert client.delete(f'/api/projects/{pid}').status_code == 204
+        assert client.get('/api/projects').json() == []

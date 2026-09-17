@@ -35,9 +35,6 @@ class Store:
         config_changed = False
         if 'devices' not in project:
             serial_port = project.get('serial_port')
-            if project.get('template') == 'led' and pid == 'smart-connectivity' and not serial_port:
-                serial_port = 'COM5'
-                project['serial_port'] = serial_port
             project['devices'] = [{'id': project['device_id'], 'connector': project.get('connector', 'usb'), 'serial_port': serial_port}]
             config_changed = True
         project['graph'], changed = migrate_graph(project['graph'], project.get('freshness_seconds', 8), project.get('template'), project['device_id'], project.get('connector', 'usb'), project.get('mapping'))
@@ -61,9 +58,15 @@ class Store:
         self.execute('UPDATE projects SET config=? WHERE id=?', (json.dumps(project), pid))
         return project
 
-    def seed(self):
-        if not self.rows('SELECT id FROM projects WHERE id=?', ('smart-connectivity',)):
-            self.create_project(ProjectCreate(name='UNO R4 LED', template='led', device_id='uno-r4-01', connector='usb', serial_port='COM5'), 'smart-connectivity')
+    def delete_project(self, pid):
+        self.project(pid)
+        with self.lock:
+            self.db.execute('DELETE FROM action_expectations WHERE action_id IN (SELECT id FROM actions WHERE project=?)', (pid,))
+            self.db.execute('DELETE FROM boots WHERE session IN (SELECT id FROM sessions WHERE project=?)', (pid,))
+            for table in ('readings', 'events', 'conversations', 'actions', 'sessions', 'gateways'):
+                self.db.execute(f'DELETE FROM {table} WHERE project=?', (pid,))
+            self.db.execute('DELETE FROM projects WHERE id=?', (pid,))
+            self.db.commit()
 
     def create_session(self, pid, mode, recording=None):
         self.project(pid)

@@ -12,6 +12,7 @@ import time
 import pytest
 from fastapi.testclient import TestClient
 from backend.main import create_app
+from backend.models import ProjectCreate
 
 @pytest.mark.skipif(os.getenv('RUN_MQTT_TESTS') != '1', reason='Opt-in MQTT/socket integration fixture')
 def test_serial_to_mqtt_to_websocket(tmp_path, monkeypatch):
@@ -29,6 +30,7 @@ def test_serial_to_mqtt_to_websocket(tmp_path, monkeypatch):
     try:
         assert b'ready' in broker.stdout.readline()
         app=create_app(str(tmp_path/'integration.db'))
+        app.state.store.create_project(ProjectCreate(name='Integration LED', template='led', device_id='uno-r4-01', connector='usb'), 'smart-connectivity')
         with TestClient(app) as client, socket.socket() as serial_fixture:
             serial_fixture.bind(('127.0.0.1',0))
             serial_fixture.listen(1)

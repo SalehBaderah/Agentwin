@@ -14,7 +14,7 @@ from .agent import answer
 
 load_dotenv()
 def create_app(path=None, background=True):
-    store = Store(path or os.getenv('DATABASE_PATH', 'data/agentwin.db')); store.seed(); runtime = Runtime(store)
+    store = Store(path or os.getenv('DATABASE_PATH', 'data/agentwin.db')); runtime = Runtime(store)
     @asynccontextmanager
     async def lifespan(app):
         if background: runtime.start_mqtt(); tick = asyncio.create_task(runtime.tick())
@@ -35,6 +35,8 @@ def create_app(path=None, background=True):
     def projects(): return [store.state(project['id']) for project in store.projects()]
     @app.post('/api/projects', status_code=201)
     def create(body: ProjectCreate): return store.create_project(body)
+    @app.delete('/api/projects/{pid}', status_code=204)
+    def delete_project(pid: str): store.delete_project(pid)
     @app.post('/api/projects/{pid}/devices', status_code=201)
     def register_device(pid: str, body: DeviceCreate): return store.register_device(pid, body)
     @app.get('/api/projects/{pid}')

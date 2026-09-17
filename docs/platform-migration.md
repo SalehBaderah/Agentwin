@@ -1,6 +1,6 @@
 # Agentwin multi-project platform
 
-The UNO R4 LED circuit is a saved `led` project named `UNO R4 LED`; it is not a platform-wide board, GPIO, or serial-port default. Existing LED readings and actions remain scoped to `smart-connectivity` and `uno-r4-01` during migration.
+The UNO R4 LED circuit is available through the `led` template; it is not created automatically and is not a platform-wide board, GPIO, or serial-port default. Operators choose the project and device identities during onboarding.
 
 ## Project contract
 
@@ -33,10 +33,10 @@ Topic paths are scoped as `agentwin/{project_id}/{device_id}/telemetry`, `.../st
 For USB, run:
 
 ```powershell
-.\.venv\Scripts\python.exe -m gateway.serial_gateway --port COM5 --project smart-connectivity --device uno-r4-01
+.\.venv\Scripts\python.exe -m gateway.serial_gateway --port COM5 --project YOUR_PROJECT_ID --device YOUR_DEVICE_ID
 ```
 
-`COM5` is only the saved LED showcase configuration; choose the actual port for every other device.
+Replace the placeholders and COM port with the values saved during project onboarding.
 
 For UNO R4 WiFi, copy `firmware/agentwin/secrets.example.h` to ignored `secrets.h`, fill in a private LAN broker, set `USE_WIFI_MQTT` to `1`, and upload. USB is still useful for first upload and troubleshooting. The Wi-Fi firmware follows the shared MQTT schema but has not been physically verified in this repository.
 

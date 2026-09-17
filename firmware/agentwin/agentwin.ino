@@ -9,8 +9,9 @@ WiFiClient network;
 MqttClient mqtt(network);
 #endif
 
-const char PROJECT_ID[] = "smart-connectivity";
-const char DEVICE_ID[] = "uno-r4-01";
+// Match these values to the project and device created in Agentwin.
+const char PROJECT_ID[] = "replace-with-project-id";
+const char DEVICE_ID[] = "device-01";
 const int LED_PIN = 7;
 const unsigned long SAMPLE_INTERVAL_MS = 1000;
 unsigned long sequenceNumber = 0, lastSample = 0, lastReconnect = 0;

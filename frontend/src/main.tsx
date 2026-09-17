@@ -252,19 +252,22 @@ function Overview({
             </div>
             <div>
               <h2>
-                {events.length
+                {!states.length
+                  ? "Create your first project"
+                  : events.length
                   ? `${events.length} event${events.length === 1 ? "" : "s"} need attention`
                   : "No open events"}
               </h2>
               <p>
-                {states.filter((s) => s.status === "reporting").length} of{" "}
-                {states.length} projects are reporting from their current data source.
+                {states.length
+                  ? `${states.filter((s) => s.status === "reporting").length} of ${states.length} projects are reporting from their current data source.`
+                  : "Start with a template, then connect one or more real devices."}
               </p>
             </div>
             <Link
-              to={events.length ? "/events" : "/projects/smart-connectivity"}
+              to={events.length ? "/events" : states.length ? `/projects/${states[0].project.id}` : "/projects/new"}
             >
-              {events.length ? "Review events" : "Open showcase"}{" "}
+              {events.length ? "Review events" : states.length ? "Open project" : "Add project"}{" "}
               <ArrowRight size={16} />
             </Link>
           </section>
@@ -299,6 +302,7 @@ function Overview({
         </span>
       </div>
       <div className="project-grid">
+        {!states.length && <div className="empty"><Layers/><h3>No projects yet</h3><p>Create a project to define its devices, telemetry, Twin, and controls.</p><Link className="button primary" to="/projects/new"><Plus size={16}/> Add your first project</Link></div>}
         {states.map((s) => (
           <Link
             className="project-card"
@@ -318,9 +322,7 @@ function Overview({
               </Badge>
             </div>
             <div className="project-type">
-              {s.project.template === "connectivity"
-                ? "Connectivity template"
-                : "Generic sensor template"}
+              {s.project.template.replaceAll("_", " ")} template
             </div>
             <h3>{s.project.name}</h3>
             {s.project.arabic_title && (
@@ -429,6 +431,7 @@ function Stat({
 }
 function Workspace({ connected }: { connected: boolean }) {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [state, setState] = useState<State | null>(null),
     [error, setError] = useState(""),
     [sid, setSid] = useState(""),
@@ -499,7 +502,7 @@ function Workspace({ connected }: { connected: boolean }) {
             </p>
           )}
         </div>
-        <label className="source-picker">Session<select value={state.session.id} onChange={(event) => setSid(event.target.value)}>{state.sessions.map((session) => <option key={session.id} value={session.id}>{session.mode} · {time(session.created)}</option>)}</select></label>
+        <div className="project-actions"><label className="source-picker">Session<select value={state.session.id} onChange={(event) => setSid(event.target.value)}>{state.sessions.map((session) => <option key={session.id} value={session.id}>{session.mode} · {time(session.created)}</option>)}</select></label><button className="danger" onClick={removeProject}>Delete project</button></div>
       </div>
       <div className="status-line">
         <Badge tone="success">live</Badge>
@@ -588,6 +591,11 @@ function Workspace({ connected }: { connected: boolean }) {
 
 function ProjectOverview({ state }: { state: State }) {
   const p = state.project;
+  const removeProject = async () => {
+    if (!window.confirm(`Delete ${p.name} and all of its stored sessions, readings, events, and actions?`)) return;
+    try { await api(`/projects/${p.id}`, {}, "DELETE"); navigate("/projects"); }
+    catch (failure) { setError((failure as Error).message); }
+  };
   return <div className="project-overview"><div className="stats">{Object.entries(p.graph.fields).map(([key, field]) => <Stat key={key} label={field.label} value={<>{display(state.latest?.readings[key])}<em>{field.unit}</em></>} hint={state.latest ? `Received ${time(state.latest.received)}` : "No reported value"} icon={<Activity />}/>)}</div><div className="overview-split"><section className="panel"><h3>Devices</h3>{state.devices.map((device) => <div className="detail-relation" key={device.id}><span>{device.id} · {device.connector}</span><strong>{device.reporting ? "reporting" : device.online ? "connected" : "unavailable"}</strong></div>)}</section><section className="panel"><h3>Recent actions</h3>{state.actions.length ? state.actions.slice(0, 5).map((action) => <div className="detail-relation" key={action.id}><span>{action.action.replace(":", " ")}</span><strong>{action.status.replace("_", " ")}</strong></div>) : <p className="detail-empty">No commands have been requested.</p>}</section></div><AgentPanel state={state}/></div>;
 }
 
