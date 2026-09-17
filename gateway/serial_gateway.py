@@ -4,6 +4,7 @@ import json
 import logging
 import os
 import queue
+import re
 import time
 import serial
 from dotenv import load_dotenv
@@ -20,12 +21,17 @@ def validate_line(line, project, device):
         raise ValueError('Serial identity differs from registered gateway identity')
     return message.model_dump_json()
 
-def validate_command(payload):
+def validate_command(payload, project=None, device=None):
     if len(payload) > 1024:
         raise ValueError('Command too large')
     body = json.loads(payload)
-    if body.get('schema_version') != 1 or body.get('action') != 'set_led' or body.get('component_id') != 'led' or not isinstance(body.get('value'), bool):
+    if body.get('schema_version') != 1 or body.get('action') != 'set_led' or not isinstance(body.get('value'), bool):
         raise ValueError('Unsupported command')
+    if not isinstance(body.get('component_id'), str) or not re.fullmatch(r'[a-z][a-z0-9-]{0,63}', body['component_id']): raise ValueError('Invalid component identity')
+    for key in ('project_id', 'device_id'):
+        if key in body and (not isinstance(body[key], str) or not re.fullmatch(r'[a-z0-9-]{1,64}', body[key])): raise ValueError(f'Invalid {key}')
+    if project is not None and body.get('project_id') != project: raise ValueError('Command project differs from gateway scope')
+    if device is not None and body.get('device_id') != device: raise ValueError('Command device differs from gateway scope')
     command_id = body.get('command_id')
     if not isinstance(command_id, str) or not command_id or len(command_id) > 47:
         raise ValueError('Invalid command identity')
@@ -54,7 +60,7 @@ def main():
         if msg.topic != topic + '/command' or msg.retain or len(msg.payload) > 1024:
             return
         try:
-            commands.put_nowait(validate_command(msg.payload))
+            commands.put_nowait(validate_command(msg.payload, args.project, args.device))
         except (ValueError, json.JSONDecodeError, queue.Full):
             log.warning('Invalid or excess command rejected')
     client.on_connect = connected

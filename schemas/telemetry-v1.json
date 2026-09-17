@@ -32,6 +32,10 @@
       "title": "Uptime Ms",
       "type": "integer"
     },
+    "session_registration": {
+      "title": "Session Registration",
+      "type": "boolean"
+    },
     "readings": {
       "additionalProperties": {
         "anyOf": [
@@ -60,6 +64,7 @@
     "boot_id",
     "sequence",
     "uptime_ms",
+    "session_registration",
     "readings"
   ],
   "title": "Telemetry",

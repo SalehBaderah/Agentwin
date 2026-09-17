@@ -1,1 +1,9 @@
 default_fqbn: arduino:renesas_uno:unor4wifi
+profiles:
+  uno-r4:
+    fqbn: arduino:renesas_uno:unor4wifi
+    platforms:
+      - platform: arduino:renesas_uno
+    libraries:
+      - ArduinoJson (7.2.1)
+      - ArduinoMqttClient (0.1.8)

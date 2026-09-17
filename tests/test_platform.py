@@ -17,7 +17,7 @@ def store(tmp_path):
     value.db.close()
 
 def packet(project, sequence=0, boot='boot-1', readings=None):
-    return {'schema_version': 1, 'project_id': project['id'], 'device_id': project['device_id'], 'boot_id': boot, 'sequence': sequence, 'uptime_ms': sequence * 1000, 'readings': readings or {project['graph']['primary_field']: 24.0}}
+    return {'schema_version': 1, 'project_id': project['id'], 'device_id': project['device_id'], 'boot_id': boot, 'sequence': sequence, 'uptime_ms': sequence * 1000, 'session_registration': True, 'readings': readings or {project['graph']['primary_field']: 24.0}}
 
 def test_multiple_projects_persist_and_ingest_independently(store):
     led = store.project('smart-connectivity')
@@ -63,6 +63,30 @@ def test_commands_and_telemetry_are_scoped(store):
     with pytest.raises(ValueError): validate_line(text, 'other-project', project['device_id'])
     command = {'schema_version': 1, 'command_id': 'action-1', 'action': 'set_led', 'component_id': 'led', 'value': True}
     assert json.loads(validate_command(json.dumps(command)))['value'] is True
+    scoped = {**command, 'project_id': project['id'], 'device_id': project['device_id']}
+    assert json.loads(validate_command(json.dumps(scoped), project['id'], project['device_id']))['command_id'] == 'action-1'
+    with pytest.raises(ValueError): validate_command(json.dumps(scoped), 'another-project', project['device_id'])
+    with pytest.raises(ValueError): validate_command(json.dumps({**command, 'value': 1}))
+
+def test_schema_rejections_and_session_isolation(store):
+    project = store.project('smart-connectivity'); live = store.session(project['id'], mode='live')['id']; simulated = store.session(project['id'], mode='simulated')['id']
+    assert store.ingest(packet(project, readings={'led_on':False,'last_command_id':None}), live)['accepted']
+    assert store.ingest(packet(project, readings={'led_on':False,'last_command_id':None}), simulated)['accepted']
+    assert store.ingest(packet(project, readings={'led_on':False,'last_command_id':None}), live)['reason'] == 'duplicate or out of order'
+    with pytest.raises(ValueError, match='Unexpected fields'): store.ingest(packet(project, 1, readings={'unknown':2}), live)
+    with pytest.raises(ValueError, match='must be boolean'): store.ingest(packet(project, 1, readings={'led_on':1}), live)
+
+def test_missing_telemetry_starts_only_after_first_report(store):
+    project = store.project('smart-connectivity'); sid = store.session(project['id'], mode='live')['id']
+    store.evaluate(project['id'], sid, now=time.time()+30)
+    assert store.events(project['id'], sid) == []
+    observed = time.time()+31
+    assert store.ingest(packet(project, readings={'led_on':False,'last_command_id':None}), sid, now=observed)['accepted']
+    store.evaluate(project['id'], sid, now=observed+project['freshness_seconds']+1)
+    events = store.events(project['id'], sid)
+    assert len(events) == 1 and events[0]['recovered'] is None
+    assert store.ingest(packet(project, 1, readings={'led_on':False,'last_command_id':None}), sid, now=observed+project['freshness_seconds']+2)['accepted']
+    assert store.events(project['id'], sid)[0]['recovered'] is not None
 
 def test_http_onboarding_and_project_sessions(tmp_path):
     app = create_app(str(tmp_path/'http.db'), background=False)
@@ -72,11 +96,28 @@ def test_http_onboarding_and_project_sessions(tmp_path):
         assert created.status_code == 201
         pid = created.json()['id']; state = client.get(f'/api/projects/{pid}').json()
         assert state['project']['graph']['primary_field'] == 'water_level_cm'
-        added = client.post(f'/api/projects/{pid}/devices', json={'device_id': 'tank-02', 'connector': 'usb', 'serial_port': 'COM8'})
-        assert added.status_code == 201
+        added = client.post(f'/api/projects/{pid}/devices', json={'device_id': 'tank-02', 'connector': 'usb', 'serial_port': 'COM8'}); assert added.status_code == 201
         assert {device['id'] for device in added.json()['devices']} == {'tank-01', 'tank-02'}
-        simulated = client.post(f'/api/projects/{pid}/sessions', json={'mode': 'simulated'})
-        assert simulated.status_code == 201
+        setup = client.get(f'/api/projects/{pid}/devices/tank-01/setup'); assert setup.status_code == 200
+        assert setup.json()['topics']['telemetry'] == f'agentwin/{pid}/tank-01/telemetry'
+        assert client.post(f'/api/projects/{pid}/sessions', json={'mode': 'simulated'}).status_code == 201
         assert client.get('/api/projects').json()[0]['project']['id'] == pid
         assert client.delete(f'/api/projects/{pid}').status_code == 204
         assert client.get('/api/projects').json() == []
+
+def test_composed_fields_sessions_and_setup_bundle(tmp_path):
+    store = Store(str(tmp_path/'composed.db'))
+    project = store.create_project(ProjectCreate(name='Greenhouse', template='generic', device_id='uno-r4', connector='usb', serial_port='COM5', components=[
+        {'component_id':'status-led','component_type':'led','label':'Status LED','device_id':'uno-r4','pin':'D7','field_key':'status_led_on','field_type':'boolean','unit':'','precision':0},
+        {'component_id':'moisture','component_type':'analog','label':'Moisture','device_id':'uno-r4','pin':'A5','field_key':'moisture_raw','field_type':'number','unit':'count','precision':0},
+    ]))
+    assert set(project['graph']['fields']) == {'status_led_on','status-led_last_command_id','moisture_raw'}
+    sid = store.session(project['id'], mode='live')['id']
+    first = packet(project, readings={'status_led_on':False,'status-led_last_command_id':None,'moisture_raw':503})
+    assert store.ingest(first, sid)['accepted']
+    rejected = {**first, 'boot_id':'restarted', 'sequence':0, 'session_registration':False}
+    assert store.ingest(rejected, sid)['reason'] == 'new device session requires registration'
+    restarted = {**rejected, 'session_registration':True}
+    assert store.ingest(restarted, sid)['accepted']
+    assert store.ingest({**first, 'sequence':1}, sid)['reason'] == 'retired device session'
+    store.db.close()

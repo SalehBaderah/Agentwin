@@ -5,11 +5,14 @@ from .store import uid
 log = logging.getLogger(__name__)
 
 def sample(project, boot, sequence, elapsed, scenario='normal'):
-    template = project['template']; field = project['graph']['primary_field']
-    if template == 'led': readings = {'led_on': False, 'last_command_id': None}
-    elif template == 'connectivity': readings = {'rf_detector_v': round(1.2 + .04 * math.sin(sequence / 5), 4), 'wifi_rssi_dbm': None}
-    else: readings = {field: round(23 + math.sin(sequence / 5), 2)}
-    return {'schema_version': 1, 'project_id': project['id'], 'device_id': project['device_id'], 'boot_id': boot, 'sequence': sequence, 'uptime_ms': int(elapsed * 1000), 'readings': readings}
+    readings = {}
+    for field, spec in project['graph']['fields'].items():
+        if spec.get('device_id') not in (None, project['device_id']): continue
+        if field.endswith('last_command_id'): readings[field] = None
+        elif spec.get('data_type') == 'boolean': readings[field] = False
+        elif spec.get('data_type') == 'categorical': readings[field] = 'simulated'
+        else: readings[field] = round(23 + math.sin(sequence / 5), spec.get('precision', 2))
+    return {'schema_version': 1, 'project_id': project['id'], 'device_id': project['device_id'], 'boot_id': boot, 'sequence': sequence, 'uptime_ms': int(elapsed * 1000), 'session_registration': True, 'readings': readings}
 
 class Runtime:
     def __init__(self, store): self.store, self.tasks, self.mqtt_connected, self.rejections, self.client = store, {}, False, 0, None
@@ -41,6 +44,8 @@ class Runtime:
         component = next((item for item in project['graph']['components'] if item['id'] == component_id), None)
         control = next((item for item in (component or {}).get('controls', []) if item['action'] == action), None)
         if not control or f'action:{action}' not in component['capabilities']: raise ValueError('Action is not implemented for this component')
+        allowed = control.get('parameters', {}).get('value', {}).get('allowed_values')
+        if allowed is not None and value not in allowed: raise ValueError('Value is not allowed for this capability')
         device = project['graph']['fields'].get(control['expected']['field'], {}).get('device_id') or project['device_id']
         device_config = next((item for item in project['devices'] if item['id'] == device), None)
         if not device_config: raise ValueError('Control device is not registered to this project')
@@ -49,8 +54,9 @@ class Runtime:
         if not self.client or not self.mqtt_connected: raise ValueError('MQTT broker is not connected')
         action_id, timeout = uid(), control.get('timeout_seconds', 15)
         self.store.execute('INSERT INTO actions VALUES (?,?,?,?,?,?,?)', (action_id, pid, sid, time.time(), f'{action}:{json.dumps(value)}', component_id, 'requested'))
-        self.store.execute('INSERT INTO action_expectations VALUES (?,?,?,?,?)', (action_id, device, control['expected']['field'], json.dumps(value), time.time()+timeout))
-        info = self.client.publish(f'agentwin/{pid}/{device}/command', json.dumps({'schema_version': 1, 'command_id': action_id, 'action': action, 'component_id': component_id, 'value': value}), qos=1, retain=False)
+        command_field = control['expected'].get('command_field', 'last_command_id')
+        self.store.execute('INSERT INTO action_expectations(action_id,device,field,expected,deadline,command_field) VALUES (?,?,?,?,?,?)', (action_id, device, control['expected']['field'], json.dumps(value), time.time()+timeout, command_field))
+        info = self.client.publish(f'agentwin/{pid}/{device}/command', json.dumps({'schema_version': 1, 'project_id': pid, 'device_id': device, 'command_id': action_id, 'action': action, 'component_id': component_id, 'value': value}), qos=1, retain=False)
         if info.rc != mqtt.MQTT_ERR_SUCCESS: self.store.execute("UPDATE actions SET status='failed' WHERE id=?", (action_id,)); raise ValueError('Command could not be published')
         return {'id': action_id, 'status': 'requested', 'timeout_seconds': timeout}
 

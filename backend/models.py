@@ -11,11 +11,30 @@ class Telemetry(Strict):
     boot_id: str = Field(min_length=1, max_length=80)
     sequence: int = Field(ge=0)
     uptime_ms: int = Field(ge=0)
+    session_registration: bool = False
     readings: dict[str, float | bool | str | None]
 
 class Mapping(Strict):
     field: str = Field(default='sensor_value', pattern=r'^[a-z][a-z0-9_]{0,39}$')
     unit: str = Field(default='value', min_length=1, max_length=20)
+
+class DeviceCreate(Strict):
+    device_id: str = Field(pattern=r'^[a-z0-9-]{1,64}$')
+    connector: Literal['usb', 'mqtt']
+    serial_port: str | None = Field(default=None, max_length=80)
+    baud_rate: int = Field(default=115200, ge=1200, le=2000000)
+
+class ComponentCreate(Strict):
+    component_id: str = Field(pattern=r'^[a-z][a-z0-9-]{0,63}$')
+    component_type: Literal['controller', 'led', 'temperature', 'humidity', 'analog', 'readonly']
+    label: str = Field(min_length=1, max_length=100)
+    device_id: str = Field(pattern=r'^[a-z0-9-]{1,64}$')
+    pin: str | None = Field(default=None, max_length=20)
+    field_key: str | None = Field(default=None, pattern=r'^[a-z][a-z0-9_]{0,39}$')
+    field_type: Literal['number', 'boolean', 'categorical'] = 'number'
+    unit: str = Field(default='', max_length=20)
+    precision: int = Field(default=2, ge=0, le=8)
+    freshness_seconds: int | None = Field(default=None, ge=3, le=3600)
 
 class ProjectCreate(Strict):
     name: str = Field(min_length=1, max_length=100)
@@ -28,15 +47,20 @@ class ProjectCreate(Strict):
     interval_seconds: int = Field(default=1, ge=1, le=600)
     high_limit: float | None = None
     cable_description: str = Field(default='Configured connection', max_length=300)
+    devices: list[DeviceCreate] = Field(default_factory=list, max_length=16)
+    components: list[ComponentCreate] = Field(default_factory=list, max_length=64)
+    retention_days: int = Field(default=30, ge=1, le=3650)
     @model_validator(mode='after')
     def intervals(self):
         if self.freshness_seconds < self.interval_seconds * 2: raise ValueError('Freshness must be at least twice the sampling interval')
+        device_ids = [self.device_id, *(device.device_id for device in self.devices)]
+        if len(device_ids) != len(set(device_ids)): raise ValueError('Device identities must be unique within a project')
+        if any(component.device_id not in device_ids for component in self.components): raise ValueError('Every component must map to a registered device')
+        component_ids = [component.component_id for component in self.components]
+        if len(component_ids) != len(set(component_ids)): raise ValueError('Component identities must be unique')
+        field_keys = [component.field_key for component in self.components if component.field_key]
+        if len(field_keys) != len(set(field_keys)): raise ValueError('Field keys must be unique')
         return self
-
-class DeviceCreate(Strict):
-    device_id: str = Field(pattern=r'^[a-z0-9-]{1,64}$')
-    connector: Literal['usb', 'mqtt']
-    serial_port: str | None = Field(default=None, max_length=80)
 
 class ComponentAction(Strict):
     component_id: str = Field(pattern=r'^[a-z0-9-]{1,64}$')

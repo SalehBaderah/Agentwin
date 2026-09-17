@@ -29,7 +29,7 @@ export type Component = {
   group?: string | null;
   bindings: string[];
   capabilities: string[];
-  controls?: { action: string; label: string; parameters: Record<string, unknown>; expected: { field: string }; timeout_seconds?: number }[];
+  controls?: { action: string; label: string; parameters: Record<string, unknown>; expected: { field: string; command_field?: string }; timeout_seconds?: number }[];
   configuration: Record<string, unknown>;
   visual: Record<string, unknown>;
 };
@@ -59,7 +59,9 @@ export type Project = {
   attenuator_inserted?: boolean;
   cable_description: string;
   mapping: { field: string; unit: string };
-  devices: { id: string; connector: string; serial_port?: string | null }[];
+  devices: { id: string; connector: string; serial_port?: string | null; baud_rate?: number }[];
+  components?: Record<string, unknown>[];
+  retention_days: number;
   graph: {
     schema_version: number;
     primary_field: string;
@@ -67,6 +69,7 @@ export type Project = {
     components: Component[];
     edges: { id: string; source: string; target: string; kind: string; label: string; category: string }[];
     groups: { id: string; name: string }[];
+    capabilities?: Record<string, unknown>[];
   };
 };
 export type Session = {
@@ -85,6 +88,7 @@ export type State = {
   events: Event[];
   actions: { id: string; created: number; action: string; target: string; status: string }[];
   devices: { id: string; connector: string; online: boolean; reporting: boolean }[];
+  field_status: Record<string, { received: number | null; fresh: boolean; device_id?: string | null }>;
   status: string;
   gateway_status: string;
 };

@@ -45,7 +45,7 @@ def test_serial_to_mqtt_to_websocket(tmp_path, monkeypatch):
                 assert app.state.runtime.mqtt_connected
                 time.sleep(1)
                 for i in range(4):
-                    payload={'schema_version':1,'project_id':'smart-connectivity','device_id':'uno-r4-01','boot_id':'serial-fixture','sequence':i,'uptime_ms':i*1000,'readings':{'led_on':False,'last_command_id':None}}
+                    payload={'schema_version':1,'project_id':'smart-connectivity','device_id':'uno-r4-01','boot_id':'serial-fixture','sequence':i,'uptime_ms':i*1000,'session_registration':True,'readings':{'led_on':False,'last_command_id':None}}
                     line=json.dumps(payload).encode()+b'\n'
                     # A partial frame must survive a serial read timeout.
                     connection.sendall(line[:40])

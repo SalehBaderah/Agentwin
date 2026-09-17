@@ -39,6 +39,14 @@ def create_app(path=None, background=True):
     def delete_project(pid: str): store.delete_project(pid)
     @app.post('/api/projects/{pid}/devices', status_code=201)
     def register_device(pid: str, body: DeviceCreate): return store.register_device(pid, body)
+    @app.get('/api/projects/{pid}/devices/{device_id}/setup')
+    def device_setup(pid: str, device_id: str):
+        project = store.project(pid); device = next((item for item in project['devices'] if item['id'] == device_id), None)
+        if not device: raise ValueError('Device is not registered to this project')
+        fields = {key: value for key, value in project['graph']['fields'].items() if value.get('device_id') == device_id}
+        components = [item for item in project['graph']['components'] if item.get('configuration', {}).get('device_id') == device_id]
+        base = f'agentwin/{pid}/{device_id}'
+        return {'project_id': pid, 'device_id': device_id, 'connector': device['connector'], 'serial_port': device.get('serial_port'), 'baud_rate': device.get('baud_rate', 115200), 'topics': {'telemetry': base+'/telemetry', 'command': base+'/command', 'status': base+'/status'}, 'fields': fields, 'components': components, 'freshness_seconds': project['freshness_seconds'], 'session_registration_required': True}
     @app.get('/api/projects/{pid}')
     def state(pid: str, session: str | None = None): return store.state(pid, session)
     @app.post('/api/projects/{pid}/sessions', status_code=201)
@@ -55,7 +63,7 @@ def create_app(path=None, background=True):
     async def agent(pid: str, sid: str, body: Question): return await answer(store, pid, sid, body.question, component_id=body.component_id)
     @app.put('/api/projects/{pid}/settings')
     def settings(pid: str, body: Settings):
-        project = store.project(pid); project.update(body.model_dump()); project['graph'] = definition(project['template'], project['mapping'], cable=project['cable_description'], device_id=project['device_id'], connector=project['connector']); store.execute('UPDATE projects SET config=? WHERE id=?', (json.dumps(project), pid)); return project
+        project = store.project(pid); project.update(body.model_dump()); project['graph'] = definition(project['template'], project['mapping'], cable=project['cable_description'], device_id=project['device_id'], connector=project['connector'], devices=project['devices'], components=project.get('components') or None, freshness_seconds=project['freshness_seconds']); store.execute('UPDATE projects SET config=? WHERE id=?', (json.dumps(project), pid)); return project
     @app.websocket('/api/ws')
     async def websocket(ws: WebSocket):
         await ws.accept()

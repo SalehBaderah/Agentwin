@@ -36,9 +36,9 @@ Compose binds Mosquitto only to `127.0.0.1:1883`. The backend retries broker con
 ## What works
 
 - Overview, project workspace, add-project flow, events and useful setup settings.
-- Connectivity template plus a generic numeric sensor template with editable field/unit mapping, one registered device per project, scoped agent configuration and a stored component graph.
+- Editable starting templates with multiple devices, supported components, typed fields, scoped capabilities, and project-scoped agent configuration.
 - Deterministic normal/level-change/pause/recovery simulations through the **same Store.ingest validation and storage boundary** as MQTT. UI components never generate readings. The simulator calls ingestion directly so a broker is not required for a laptop demo.
-- SQLite project definitions, source sessions, readings, events, acknowledgements/proposals and successful agent conversations survive restart. Demo seeding is idempotent. Simulation producers are intentionally not resumed automatically after restart.
+- SQLite project definitions, source sessions, readings, events, actions, and successful agent conversations survive restart. A fresh database contains no hardcoded projects. Simulation producers are intentionally not resumed automatically after restart.
 - Live, simulated and replay histories and latest-state calculations are session-isolated. Replay explicitly selects the currently viewed original recording, keeps original provenance/timestamps and replays at most its latest 180 samples. Replay does not trigger fresh operational events.
 - WebSocket snapshots update the overview and project workspace every second. Reconnect loads the current state via HTTP and resumes snapshots; charts/browser readings are bounded to 180 samples. Missing samples produce chart gaps.
 - Device/project/topic validation, strict versioned schema, finite/range/type checks, deduplication, retired-boot rejection, retained-message rejection, server receipt timestamps and connector-derived source metadata.
@@ -83,10 +83,10 @@ The attached build prompt overrides the original IDRAK briefs: public name **Age
 
 - Default freshness 8 seconds, sampling 1 second, high detector limit 1.6 V; these are demo defaults, not measured operating limits. Generic seed uses °C and limit 30, explicitly synthetic. A new project defines its own unit/field/limit.
 - Overview and project routes use **live** sessions by default. Simulation remains available from the source selector and never replaces a disconnected live source.
-- First sample of a previously unseen boot must have uptime ≤30 seconds. Start services, then reset the board. Subsequent samples are checked against the receipt/uptime anchor; a drift beyond the configured freshness tolerance is rejected. Clean MQTT sessions/QoS 0 avoid queued playback. Without a trusted device clock/challenge, an unknown first packet cannot be proven newly measured; the 30-second bootstrap bound is a conservative MVP constraint.
+- Each telemetry packet explicitly registers its boot session. A newly observed boot can arrive late, retires the prior boot for that device, and old-session or out-of-order packets are rejected. MQTT telemetry is non-retained and browser/API histories are bounded.
 - ADC defaults: 12 bits, nominal 5 V, A0. RF dBm is always unavailable in this version because no valid setup calibration exists. Module supply/pinout remains unresolved pending hardware identification.
-- One SQLite writer process; run **one Uvicorn worker**. No cloud deployment, authentication, retention automation, OTA sampling changes, calibration editor, trained anomaly detection, or behavioral prediction is included. Physical control is currently limited to the local D7 LED acceptance path.
-- Database history is persistent and grows over time; browser/API windows are bounded. Back up `data/agentwin.db` while stopped (or use SQLite backup tooling). Retention/export and migrations are backlog items.
+- One SQLite writer process; run **one Uvicorn worker**. No cloud deployment, application authentication, OTA changes, calibration editor, trained anomaly detection, or behavioral prediction is included. Physical control is limited to declared LED capabilities.
+- Each project has configurable reading retention; cleanup deletes at most 200 expired readings per evaluation. Events and actions are preserved. Back up `data/agentwin.db` while stopped or use SQLite backup tooling.
 - English-first interface with Arabic-capable fallback and direction-aware project titles. Core labels are centralized; complete localization extraction remains future work.
 
 ## Verify and rehearse
