@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   BrowserRouter,
@@ -7,6 +7,7 @@ import {
   Route,
   Routes,
   useNavigate,
+  useLocation,
   useParams,
 } from "react-router-dom";
 import {
@@ -53,7 +54,12 @@ import type { Answer, Component, Event as ProjectEvent, Project, State } from ".
 import { api, display, strings, time } from "./types";
 import "@fontsource-variable/dm-sans";
 import "@fontsource-variable/manrope";
+import "./tokens.css";
+import "./motion.css";
 import "./styles.css";
+import "./modern.css";
+import { ThemeProvider, ThemeSwitcher } from "./theme";
+import { Dialog, Tabs } from "./ui";
 
 function Mark() {
   return (
@@ -97,6 +103,15 @@ function App() {
     [loaded, setLoaded] = useState(false),
     [error, setError] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
+  const route = useLocation();
+  useEffect(() => {
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const page = document.querySelector("main.page");
+    const motion = getComputedStyle(document.documentElement);
+    const animation = page?.animate([{ opacity: .5, transform: "translateY(8px)" }, { opacity: 1, transform: "translateY(0)" }], { duration: parseFloat(motion.getPropertyValue("--duration-fast")), easing: motion.getPropertyValue("--ease-smooth-out").trim() });
+    return () => animation?.cancel();
+  }, [route.pathname]);
   const refresh = useCallback(() => {
     api<State[]>("/projects")
       .then((s) => {
@@ -147,7 +162,7 @@ function App() {
     .flatMap((s) => s.events)
     .filter((e) => !e.recovered).length;
   return (
-    <div className="app">
+    <div className={`app ${collapsed ? "rail-collapsed" : ""}`}><a className="skip-link" href="#main-content">Skip to content</a>
       <aside className="sidebar">
         <Link to="/" className="brand">
           <Mark />
@@ -155,27 +170,27 @@ function App() {
           <span className="version">MVP</span>
         </Link>
         <button className="menu-toggle" aria-label="Toggle navigation" aria-expanded={menuOpen} onClick={() => setMenuOpen(!menuOpen)}>{menuOpen ? <X size={19}/> : <Menu size={19}/>}</button>
-        <nav className={menuOpen ? "open" : ""} onClick={() => setMenuOpen(false)}>
-          <NavLink to="/" end>
+        <nav aria-label="Main navigation" className="desktop-navigation">
+          <NavLink to="/" end aria-label="Overview" title="Overview">
             <LayoutDashboard size={18} />
-            {strings.overview}
+            <span className="nav-label">{strings.overview}</span>
           </NavLink>
-          <NavLink to="/projects">
+          <NavLink to="/projects" aria-label="Projects" title="Projects">
             <Layers size={18} />
-            {strings.projects}
+            <span className="nav-label">{strings.projects}</span>
             <span className="nav-count">{states.length}</span>
           </NavLink>
-          <NavLink to="/events">
+          <NavLink to="/events" aria-label="Events" title="Events">
             <Bell size={18} />
-            {strings.events}
+            <span className="nav-label">{strings.events}</span>
             {active > 0 && <span className="nav-count">{active}</span>}
           </NavLink>
-          <NavLink to="/settings">
+          <NavLink to="/settings" aria-label="Settings" title="Settings">
             <SettingsIcon size={18} />
-            {strings.settings}
+            <span className="nav-label">{strings.settings}</span>
           </NavLink>
         </nav>
-        <div className="sidebar-bottom">
+        <button className="rail-toggle" onClick={() => setCollapsed(!collapsed)} aria-label={collapsed ? "Expand navigation" : "Collapse navigation"} aria-expanded={!collapsed}><Menu size={18}/><span className="nav-label">Collapse navigation</span></button><div className="sidebar-bottom">
           <div className="local-card">
             <ShieldCheck size={18} />
             <div>
@@ -185,14 +200,15 @@ function App() {
           <small>Agent questions use the configured provider.</small>
         </div>
       </aside>
-      <div className="main">
+      <Dialog open={menuOpen} onClose={() => setMenuOpen(false)} title="Workspace navigation"><nav className="mobile-navigation" aria-label="Mobile navigation" onClick={() => setMenuOpen(false)}><NavLink to="/" end><LayoutDashboard size={20}/>Overview</NavLink><NavLink to="/projects"><Layers size={20}/>Projects</NavLink><NavLink to="/events"><Bell size={20}/>Events</NavLink><NavLink to="/settings"><SettingsIcon size={20}/>Settings</NavLink></nav><ThemeSwitcher/></Dialog>
+      <div className="main" id="main-content" tabIndex={-1}>
         <header className="topbar">
           <div className="breadcrumb">
             Agentwin <ChevronRight size={14} /> <span>Operations</span>
           </div>
-          <Badge tone={connected ? "success" : "warning"}>
+          <div className="topbar-actions"><ThemeSwitcher compact/><Badge tone={connected ? "success" : "warning"}>
             {connected ? "Backend connected" : "Reconnecting"}
-          </Badge>
+          </Badge></div>
         </header>
         {error && (
           <div className="error" role="alert">
@@ -432,7 +448,7 @@ function PlatformAnalytics({ states }: { states: State[] }) {
   const reporting = states.flatMap((state) => state.devices).filter((device) => device.reporting).length;
   const devices = states.flatMap((state) => state.devices).length;
   const pending = states.flatMap((state) => state.actions).filter((action) => action.status === "requested").length;
-  return <section className="analytics-grid"><div className="panel analytics-primary"><div className="panel-heading"><div><h2>Telemetry history</h2><p>Stored observations only; missing samples remain gaps.</p></div><div className="compact-filters"><label>Project<select value={selected.project.id} onChange={(event) => { setProjectId(event.target.value); setMetricKey(""); }}><option value={selected.project.id}>{selected.project.name}</option>{states.filter((state) => state.project.id !== selected.project.id).map((state) => <option value={state.project.id} key={state.project.id}>{state.project.name}</option>)}</select></label><label>Metric<select value={field} onChange={(event) => setMetricKey(event.target.value)}>{visibleFields.map(([key, item]) => <option value={key} key={key}>{item.label}</option>)}</select></label><label>Window<select value={windowSize} onChange={(event) => setWindowSize(event.target.value)}><option value="30">Latest 30</option><option value="90">Latest 90</option><option value="all">All stored</option></select></label></div></div>{numeric && rows.length ? <div className="overview-chart"><ResponsiveContainer width="100%" height="100%"><LineChart data={rows}><CartesianGrid vertical={false} stroke="rgba(225,201,232,.07)"/><XAxis dataKey="received" tickFormatter={(value) => time(Number(value))} minTickGap={40}/><YAxis width={48} unit={metric.unit}/><Tooltip labelFormatter={(value) => time(Number(value))} formatter={(value) => [`${display(value)} ${metric.unit}`, metric.label]}/><Line dataKey="value" stroke="#d0a7dc" strokeWidth={2} dot={false} connectNulls={false}/></LineChart></ResponsiveContainer></div> : rows.length ? <div className="discrete-history"><div className="discrete-summary"><div><span>Current state</span><strong>{metricValue(rows.at(-1)?.value,metric.precision)}</strong></div><div><span>State changes</span><strong>{Math.max(0,discreteTransitions.length-1)}</strong></div><div><span>Samples in view</span><strong>{rows.length}</strong></div></div><div className="state-track" aria-label={`${metric.label} state history`}>{rows.map((row,index)=><i key={`${row.received}-${index}`} className={row.value===true?"on":row.value===false?"off":"categorical"} title={`${time(row.received)} · ${metricValue(row.value,metric.precision)}`}/>)}</div><div className="state-track-labels"><span>{time(rows[0].received)}</span><span>{time(rows.at(-1)?.received)}</span></div><div className="discrete-changes"><h3>Recent changes</h3>{discreteTransitions.slice().reverse().slice(0,5).map((row,index)=><div key={`${row.received}-${index}`}><span>{time(row.received)}</span><strong>{metricValue(row.value,metric.precision)}</strong></div>)}</div></div> : <div className="chart-empty"><Activity/><strong>No readings yet</strong><p>The visualization appears after the selected project reports telemetry.</p></div>}</div><aside className="panel operations-panel"><div className="panel-heading"><div><h2>Operational status</h2><p>Across configured projects.</p></div></div><div className="operation-count"><strong>{reporting}/{devices}</strong><span>devices reporting</span></div><div className="status-breakdown"><div><span><i className="status-dot good"/>Reporting</span><b>{reporting}</b></div><div><span><i className="status-dot"/>Unavailable</span><b>{devices-reporting}</b></div><div><span><i className="status-dot pending"/>Pending actions</span><b>{pending}</b></div></div><Link className="button tertiary" to="/events">Review operational events <ArrowRight size={15}/></Link></aside></section>;
+  return <section className="analytics-grid"><div className="panel analytics-primary"><div className="panel-heading"><div><h2>Telemetry history</h2><p>Stored observations only; missing samples remain gaps.</p></div><div className="compact-filters"><label>Project<select value={selected.project.id} onChange={(event) => { setProjectId(event.target.value); setMetricKey(""); }}><option value={selected.project.id}>{selected.project.name}</option>{states.filter((state) => state.project.id !== selected.project.id).map((state) => <option value={state.project.id} key={state.project.id}>{state.project.name}</option>)}</select></label><label>Metric<select value={field} onChange={(event) => setMetricKey(event.target.value)}>{visibleFields.map(([key, item]) => <option value={key} key={key}>{item.label}</option>)}</select></label><label>Window<select value={windowSize} onChange={(event) => setWindowSize(event.target.value)}><option value="30">Latest 30</option><option value="90">Latest 90</option><option value="all">All stored</option></select></label></div></div>{numeric && rows.length ? <div className="overview-chart"><ResponsiveContainer width="100%" height="100%"><LineChart data={rows}><CartesianGrid vertical={false} stroke="var(--border)"/><XAxis dataKey="received" tickFormatter={(value) => time(Number(value))} minTickGap={40}/><YAxis width={48} unit={metric.unit}/><Tooltip labelFormatter={(value) => time(Number(value))} formatter={(value) => [`${display(value)} ${metric.unit}`, metric.label]}/><Line dataKey="value" stroke="var(--chart-line)" isAnimationActive={false} strokeWidth={2} dot={false} connectNulls={false}/></LineChart></ResponsiveContainer></div> : rows.length ? <div className="discrete-history"><div className="discrete-summary"><div><span>Current state</span><strong>{metricValue(rows.at(-1)?.value,metric.precision)}</strong></div><div><span>State changes</span><strong>{Math.max(0,discreteTransitions.length-1)}</strong></div><div><span>Samples in view</span><strong>{rows.length}</strong></div></div><div className="state-track" aria-label={`${metric.label} state history`}>{rows.map((row,index)=><i key={`${row.received}-${index}`} className={row.value===true?"on":row.value===false?"off":"categorical"} title={`${time(row.received)} · ${metricValue(row.value,metric.precision)}`}/>)}</div><div className="state-track-labels"><span>{time(rows[0].received)}</span><span>{time(rows.at(-1)?.received)}</span></div><div className="discrete-changes"><h3>Recent changes</h3>{discreteTransitions.slice().reverse().slice(0,5).map((row,index)=><div key={`${row.received}-${index}`}><span>{time(row.received)}</span><strong>{metricValue(row.value,metric.precision)}</strong></div>)}</div></div> : <div className="chart-empty"><Activity/><strong>No readings yet</strong><p>The visualization appears after the selected project reports telemetry.</p></div>}</div><aside className="panel operations-panel"><div className="panel-heading"><div><h2>Operational status</h2><p>Across configured projects.</p></div></div><div className="operation-count"><strong>{reporting}/{devices}</strong><span>devices reporting</span></div><div className="status-breakdown"><div><span><i className="status-dot good"/>Reporting</span><b>{reporting}</b></div><div><span><i className="status-dot"/>Unavailable</span><b>{devices-reporting}</b></div><div><span><i className="status-dot pending"/>Pending actions</span><b>{pending}</b></div></div><Link className="button tertiary" to="/events">Review operational events <ArrowRight size={15}/></Link></aside></section>;
 }
 function Stat({
   label,
@@ -457,6 +473,8 @@ function Stat({
   );
 }
 function Workspace({ connected }: { connected: boolean }) {
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const { id } = useParams();
   const navigate = useNavigate();
   const [state, setState] = useState<State | null>(null),
@@ -515,12 +533,12 @@ function Workspace({ connected }: { connected: boolean }) {
     );
   const p = state.project;
   const removeProject = async () => {
-    if (!window.confirm(`Delete ${p.name} and all of its stored sessions, readings, events, and actions?`)) return;
+    setDeleting(true);
     try { await api(`/projects/${p.id}`, {}, "DELETE"); navigate("/projects"); }
-    catch (failure) { setError((failure as Error).message); }
+    catch (failure) { setError((failure as Error).message); setDeleteOpen(false); } finally { setDeleting(false); }
   };
   return (
-    <main className="page project-page">
+    <main className="page project-page"><Dialog open={deleteOpen} onClose={() => { if (!deleting) setDeleteOpen(false); }} title="Delete project?"><p>Delete {p.name} and all of its stored sessions, readings, events, and actions?</p><p className="danger-note">This cannot be undone.</p><div className="dialog-actions"><button autoFocus onClick={() => setDeleteOpen(false)} disabled={deleting}>Cancel</button><button className="danger" disabled={deleting} onClick={removeProject}>{deleting ? "Deleting?" : "Delete project"}</button></div></Dialog>
       <Link className="back" to="/projects">
         <ArrowDownRight size={14} /> All projects
       </Link>
@@ -535,10 +553,10 @@ function Workspace({ connected }: { connected: boolean }) {
             </p>
           )}
         </div>
-        <div className="project-actions"><label className="source-picker">Session<select value={state.session.id} onChange={(event) => setSid(event.target.value)}>{state.sessions.map((session) => <option key={session.id} value={session.id}>{session.mode} · {time(session.created)}</option>)}</select></label><button className="danger" onClick={removeProject}>Delete project</button></div>
+        <div className="project-actions"><label className="source-picker">Session<select value={state.session.id} onChange={(event) => setSid(event.target.value)}>{state.sessions.map((session) => <option key={session.id} value={session.id}>{session.mode} · {time(session.created)}</option>)}</select></label><button className="ghost project-manage" onClick={() => setDeleteOpen(true)}>Manage project</button></div>
       </div>
       <div className="status-line">
-        <Badge tone="success">live</Badge>
+        <Badge>{state.session.mode} session</Badge>
         <Badge
           tone={
             connected && state.status === "reporting" ? "success" : "warning"
@@ -588,26 +606,8 @@ function Workspace({ connected }: { connected: boolean }) {
       <div className="source-note">{state.session.mode === "live" ? "Live data is scoped to this project and its registered devices." : "Test data is isolated from live device state and never routes physical commands."}</div>
       <div className="workspace-grid">
         <section className="workspace-main">
-          <div className="tabs" role="tablist">
-            {[
-              ["overview", "Overview"],
-              ["readings", "Live readings"],
-              ["twin", "Digital twin"],
-              ["events", "Events & history"],
-              ["controls", "Controls"],
-            ].map(([key, label]) => (
-              <button
-                role="tab"
-                aria-selected={tab === key}
-                key={key}
-                className={tab === key ? "active" : ""}
-                onClick={() => setTab(key)}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          <div className="tab-content">
+          <Tabs value={tab} onChange={setTab} items={[["overview", "Overview"], ["readings", "Live readings"], ["twin", "Digital twin"], ["events", "Events & history"], ["controls", "Controls"]]}/>
+          <div className="tab-content" id="project-panel" role="tabpanel" aria-labelledby={`tab-${tab}`} tabIndex={0}>
             {tab === "overview" && <ProjectOverview state={state} />}
             {tab === "readings" && <Readings state={state} />}
             {tab === "twin" && (
@@ -663,7 +663,7 @@ function Readings({ state }: { state: State }) {
   const metric = state.project.graph.fields[field];
   const rows = state.readings.map((reading) => ({ received: reading.received, value: reading.readings[field] }));
   const transitions = state.readings.filter((reading,index,all)=>index===0 || reading.readings[field]!==all[index-1].readings[field]).reverse();
-  return <div className="readings-view"><div className="chart-header"><div><h3>Readings</h3><p>{metric.data_type === "number" ? "Stored observations for this project and selected session." : "State changes only; repeated samples with the same value are collapsed."}</p></div><label>Metric<select value={field} onChange={(event) => {setField(event.target.value);setTransitionLimit(5);}}>{Object.entries(state.project.graph.fields).map(([key, item]) => <option value={key} key={key}>{item.label} {item.unit}</option>)}</select></label></div>{metric.data_type === "number" ? <div className="metric-chart"><ResponsiveContainer width="100%" height="100%"><LineChart data={rows}><Line dataKey="value" stroke="#d4addf" dot={false} connectNulls={false}/><XAxis dataKey="received" tickFormatter={(value) => time(Number(value))}/><YAxis/><Tooltip labelFormatter={(value) => time(Number(value))}/></LineChart></ResponsiveContainer></div> : <><div className="transition-list">{transitions.slice(0,transitionLimit).map((reading) => <div key={reading.id}><span>{time(reading.received)}</span><strong>{metricValue(reading.readings[field], metric.precision)}</strong></div>)}</div>{transitions.length>5&&<button className="transition-more" type="button" onClick={()=>setTransitionLimit(transitionLimit>=transitions.length?5:Math.min(transitionLimit+10,transitions.length))}>{transitionLimit>=transitions.length?"Show less":`Show more (${transitions.length-transitionLimit})`}</button>}</>}</div>;
+  return <div className="readings-view"><div className="chart-header"><div><h3>Readings</h3><p>{metric.data_type === "number" ? "Stored observations for this project and selected session." : "State changes only; repeated samples with the same value are collapsed."}</p></div><label>Metric<select value={field} onChange={(event) => {setField(event.target.value);setTransitionLimit(5);}}>{Object.entries(state.project.graph.fields).map(([key, item]) => <option value={key} key={key}>{item.label} {item.unit}</option>)}</select></label></div>{!rows.length ? <div className="chart-empty"><Activity/><strong>No readings in this session</strong><p>Readings appear here when the selected source reports telemetry. Stored values from other sessions remain separate.</p></div> : metric.data_type === "number" ? <div className="metric-chart"><ResponsiveContainer width="100%" height="100%"><LineChart data={rows}><Line dataKey="value" stroke="var(--chart-line)" isAnimationActive={false} dot={false} connectNulls={false}/><XAxis dataKey="received" tickFormatter={(value) => time(Number(value))}/><YAxis/><Tooltip labelFormatter={(value) => time(Number(value))}/></LineChart></ResponsiveContainer></div> : <><div className="transition-list">{transitions.slice(0,transitionLimit).map((reading) => <div key={reading.id}><span>{time(reading.received)}</span><strong>{metricValue(reading.readings[field], metric.precision)}</strong></div>)}</div>{transitions.length>5&&<button className="transition-more" type="button" onClick={()=>setTransitionLimit(transitionLimit>=transitions.length?5:Math.min(transitionLimit+10,transitions.length))}>{transitionLimit>=transitions.length?"Show less":`Show more (${transitions.length-transitionLimit})`}</button>}</>}</div>;
 }
 
 function ControlsPanel({ state, refresh }: { state: State; refresh: () => void }) {
@@ -674,10 +674,10 @@ function ControlsPanel({ state, refresh }: { state: State; refresh: () => void }
 }
 
 function AgentPanel({ state }: { state: State }) {
-  const [question, setQuestion] = useState(""), [answer, setAnswer] = useState<Answer | null>(null), [busy, setBusy] = useState(false);
-  const ask = async () => { if (!question.trim()) return; setBusy(true); try { setAnswer(await api<Answer>(`/projects/${state.project.id}/sessions/${state.session.id}/agent`, { question })); } finally { setBusy(false); } };
+  const [question, setQuestion] = useState(""), [answer, setAnswer] = useState<Answer | null>(null), [busy, setBusy] = useState(false), [agentError, setAgentError] = useState("");
+  const ask = async () => { if (!question.trim()) return; setBusy(true); setAgentError(""); try { setAnswer(await api<Answer>(`/projects/${state.project.id}/sessions/${state.session.id}/agent`, { question })); } catch (error) { setAgentError((error as Error).message); } finally { setBusy(false); } };
   const prompts = ["What is the current state?", "What changed recently?", "Explain active events", "Which actions are permitted?"];
-  return <section className="panel agent-mini"><div className="agent-mini-heading"><span><MessageSquare size={18}/></span><div><h3>Project agent</h3><p>Explains this system using stored evidence and permitted tools.</p></div></div><div className="agent-context"><span>Project scope</span><strong>{state.project.name}</strong><small>{state.session.mode} session · {state.status}</small></div><div className="agent-capabilities"><span>Current state</span><span>Recent readings</span><span>Events</span><span>Permitted actions</span></div><div className="agent-prompts">{prompts.map(prompt=><button type="button" key={prompt} onClick={()=>setQuestion(prompt)}>{prompt}</button>)}</div><div className="agent-question"><textarea rows={3} value={question} onChange={(event) => setQuestion(event.target.value)} placeholder="Ask about a reading, change, event, or allowed action"/><button onClick={ask} disabled={busy || !question.trim()} aria-label="Ask project agent"><Send size={16}/>{busy ? "Checking evidence…" : "Ask agent"}</button></div>{answer && <div className={`agent-answer ${answer.available ? "" : "unavailable"}`}><div><span>Finding</span><strong>{answer.finding}</strong></div>{answer.evidence.length>0&&<div><span>Evidence</span>{answer.evidence.slice(0,3).map(item=><small key={item.id}>{item.id} · {time(item.timestamp)}</small>)}</div>}<div><span>Uncertainty</span><p>{answer.uncertainty}</p></div><div><span>Next step</span><p>{answer.next_step}</p></div></div>}<p className="agent-guardrail">Actions require backend permission and operator confirmation. Device telemetry verifies completion.</p></section>;
+  return <section className="panel agent-mini"><div className="agent-mini-heading"><span><MessageSquare size={18}/></span><div><h3>Project agent</h3><p>Explains this system using stored evidence and permitted tools.</p></div></div><div className="agent-context"><span>Project scope</span><strong>{state.project.name}</strong><small>{state.session.mode} session · {state.status}</small></div><div className="agent-capabilities"><span>Current state</span><span>Recent readings</span><span>Events</span><span>Permitted actions</span></div><div className="agent-prompts">{prompts.map(prompt=><button type="button" key={prompt} onClick={()=>setQuestion(prompt)}>{prompt}</button>)}</div><div className="agent-question"><textarea aria-label="Question for project agent" rows={3} value={question} onChange={(event) => setQuestion(event.target.value)} placeholder="Ask about a reading, change, event, or allowed action"/><button onClick={ask} disabled={busy || !question.trim()} aria-label="Ask project agent"><Send size={16}/>{busy ? "Checking evidence…" : "Ask agent"}</button></div>{agentError && <p className="error" role="alert">{agentError}</p>}{answer && <div aria-live="polite" className={`agent-answer ${answer.available ? "" : "unavailable"}`}><div><span>Finding</span><strong>{answer.finding}</strong></div>{answer.evidence.length>0&&<div><span>Evidence</span>{answer.evidence.slice(0,3).map(item=><small key={item.id}>{item.id} · {time(item.timestamp)}</small>)}</div>}<div><span>Uncertainty</span><p>{answer.uncertainty}</p></div><div><span>Next step</span><p>{answer.next_step}</p></div></div>}<p className="agent-guardrail">Actions require backend permission and operator confirmation. Device telemetry verifies completion.</p></section>;
 }
 
 export function LegacyAddProject() {
@@ -724,7 +724,7 @@ function AddProject() {
   const patchComponent=(i:number,p:Partial<DraftComponent>)=>setComponents(components.map((v,n)=>n===i?{...v,...p}:v));
   const chooseTemplate=(template:string)=>{setForm({...form,template});setComponents(componentPreset(template,devices[0].device_id,form.freshness_seconds));};
   const save=async(e:React.FormEvent)=>{e.preventDefault();if(step<steps.length-1){setStep(step+1);return;} setSaving(true);setMessage("");try{const [primary,...extra]=devices;const project=await api<Project>("/projects",{...form,device_id:primary.device_id,connector:primary.connector,serial_port:primary.serial_port||null,mapping:{field:components[0]?.field_key||"sensor_value",unit:components[0]?.unit||"value"},devices:extra.map(d=>({...d,serial_port:d.serial_port||null})),components:components.map(c=>({...c,pin:c.pin||null})),cable_description:"Configured during project onboarding"});navigate(`/projects/${project.id}`);}catch(error){setMessage((error as Error).message);setSaving(false);}};
-  return <main className="page onboarding-page"><div className="page-heading"><div><h1>Add a project</h1><p>Build one scoped hardware system from registered devices, components, fields, and controls.</p></div></div><ol className="stepper setup-stepper">{steps.map((label,i)=><li className={i===step?"active":i<step?"complete":""} key={label}><span>{i<step?<Check size={14}/>:i+1}</span>{label}</li>)}</ol><form className="panel onboarding" onSubmit={save}>
+  return <main className="page onboarding-page"><div className="page-heading"><div><h1>Add a project</h1><p>Build one scoped hardware system from registered devices, components, fields, and controls.</p></div></div><ol className="stepper setup-stepper">{steps.map((label,i)=><li aria-current={i===step ? "step" : undefined} className={i===step?"active":i<step?"complete":""} key={label}><span>{i<step?<Check size={14}/>:i+1}</span>{label}</li>)}</ol><form className="panel onboarding" onSubmit={save}>
   {step===0&&<div className="form-step"><div className="form-step-heading"><h2>Project identity</h2><p>The template is an editable starting point, not a fixed project.</p></div><label>Project name<input required autoFocus value={form.name} onChange={e=>setForm({...form,name:e.target.value})} placeholder="Greenhouse bench"/></label><label>Starting template<select value={form.template} onChange={e=>chooseTemplate(e.target.value)}><option value="generic">Generic sensor</option><option value="led">LED output</option><option value="temperature">Temperature</option><option value="water">Water level</option><option value="connectivity">Connectivity / RF</option></select></label></div>}
   {step===1&&<div className="form-step"><div className="form-step-heading"><h2>Registered devices</h2><p>Each identity owns a transport and a set of fields.</p></div>{devices.map((d,i)=><div className="extra-device" key={i}><label>Device ID<input required value={d.device_id} onChange={e=>{patchDevice(i,{device_id:e.target.value});setComponents(components.map(c=>c.device_id===d.device_id?{...c,device_id:e.target.value}:c));}}/></label><label>Transport<select value={d.connector} onChange={e=>patchDevice(i,{connector:e.target.value as DraftDevice["connector"]})}><option value="usb">USB gateway</option><option value="mqtt">Wi-Fi MQTT</option></select></label><label>{d.connector==="usb"?"Serial port":"Broker route"}<input value={d.serial_port} disabled={d.connector==="mqtt"} placeholder="COM5" onChange={e=>patchDevice(i,{serial_port:e.target.value})}/></label>{i>0&&<button type="button" className="tertiary" onClick={()=>setDevices(devices.filter((_,n)=>n!==i))}>Remove</button>}</div>)}<button type="button" className="secondary-button" onClick={()=>setDevices([...devices,{device_id:`device-${devices.length+1}`,connector:"usb",serial_port:"",baud_rate:115200}])}><Plus size={15}/> Add device</button></div>}
   {step===2&&<div className="form-step"><div className="form-step-heading"><h2>Components</h2><p>Add only hardware or logical sources the firmware will report.</p></div>{components.map((c,i)=><div className="extra-device" key={i}><label>Label<input value={c.label} onChange={e=>patchComponent(i,{label:e.target.value})}/></label><label>Type<select value={c.component_type} onChange={e=>patchComponent(i,{component_type:e.target.value as DraftComponent["component_type"]})}><option value="led">LED</option><option value="analog">Analog sensor</option><option value="temperature">Temperature</option><option value="humidity">Humidity</option><option value="readonly">Read only</option></select></label><label>Device<select value={c.device_id} onChange={e=>patchComponent(i,{device_id:e.target.value})}>{devices.map(d=><option key={d.device_id}>{d.device_id}</option>)}</select></label><label>Pin<input value={c.pin} placeholder="D7 or A5" onChange={e=>patchComponent(i,{pin:e.target.value})}/></label><button type="button" className="tertiary" onClick={()=>setComponents(components.filter((_,n)=>n!==i))}>Remove</button></div>)}<button type="button" className="secondary-button" onClick={()=>setComponents([...components,{component_id:`component-${components.length+1}`,component_type:"analog",label:"Analog input",device_id:devices[0].device_id,pin:"A5",field_key:`analog_${components.length+1}`,field_type:"number",unit:"count",precision:0,freshness_seconds:form.freshness_seconds}])}><Plus size={15}/> Add component</button></div>}
@@ -734,13 +734,13 @@ function AddProject() {
   <div className="form-actions">{step>0&&<button className="tertiary" type="button" onClick={()=>setStep(step-1)}>Back</button>}<button className="primary" disabled={saving}>{step===steps.length-1?saving?"Creating project…":"Create project":"Continue"}</button></div><p role="status">{message}</p></form></main>;
 }
 const componentRegistry: Record<string, { icon: typeof Box; label: string; accent: string }> = {
-  controller: { icon: Zap, label: "Controller", accent: "#AFC6E9" },
-  actuator: { icon: Activity, label: "Actuator", accent: "#E49BA8" },
-  gateway: { icon: Router, label: "Gateway", accent: "#AFC6E9" },
-  passive: { icon: Cable, label: "Wired component", accent: "#D9B77A" },
-  power: { icon: Zap, label: "Ground", accent: "#DDBE78" },
-  software: { icon: Server, label: "Application", accent: "#BFA6CA" },
-  generic: { icon: Box, label: "Component", accent: "#B8ACBC" },
+  controller: { icon: Zap, label: "Controller", accent: "var(--info)" },
+  actuator: { icon: Activity, label: "Actuator", accent: "var(--relationship-control)" },
+  gateway: { icon: Router, label: "Gateway", accent: "var(--info)" },
+  passive: { icon: Cable, label: "Wired component", accent: "var(--relationship-physical)" },
+  power: { icon: Zap, label: "Ground", accent: "var(--relationship-power)" },
+  software: { icon: Server, label: "Application", accent: "var(--text-secondary)" },
+  generic: { icon: Box, label: "Component", accent: "var(--text-muted)" },
 };
 
 const typeIcons: Record<string, typeof Box> = {
@@ -753,7 +753,7 @@ const typeIcons: Record<string, typeof Box> = {
 };
 
 const relationshipStyle: Record<string, { color: string }> = {
-  physical: { color: "#d9b77a" }, control: { color: "#e49ba8" }, data: { color: "#d4addf" }, power: { color: "#ddbe78" }, context: { color: "#9cbfaf" },
+  physical: { color: "var(--relationship-physical)" }, control: { color: "var(--relationship-control)" }, data: { color: "var(--accent)" }, power: { color: "var(--relationship-power)" }, context: { color: "var(--success)" },
 };
 
 function metricValue(value: unknown, precision: number) {
@@ -803,6 +803,15 @@ function Twin({ state, selectedId, onSelect, refresh }: { state: State; selected
   const selected = p.graph.components.find((component) => component.id === selectedId) || defaultComponent;
   useEffect(() => { if (!selectedId && defaultComponent) onSelect(defaultComponent.id); }, [selectedId, defaultComponent, onSelect]);
   useEffect(() => { setTransitionLimit(5); }, [selected.id]);
+  const inspector = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const panel = inspector.current;
+    if (!panel) return;
+    panel.dataset.open = "false";
+    void panel.offsetWidth;
+    const frame = requestAnimationFrame(() => { panel.dataset.open = "true"; });
+    return () => cancelAnimationFrame(frame);
+  }, [selected.id]);
   const selectedMetrics = Object.entries(p.graph.fields).filter(([key, metric]) => isVisibleMetric(key) && metric.component_id === selected.id);
   const categoricalMetric = selectedMetrics.find(([, metric]) => metric.data_type !== "number");
   const categoricalTransitions = categoricalMetric ? state.readings.filter((reading,index,all)=>index===0 || reading.readings[categoricalMetric[0]]!==all[index-1].readings[categoricalMetric[0]]).reverse() : [];
@@ -819,7 +828,7 @@ function Twin({ state, selectedId, onSelect, refresh }: { state: State; selected
   }, [p.id]);
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   useEffect(() => { setNodes(current => current.map(node => { const component = p.graph.components.find(item => item.id === node.id); return component ? {...node, data:{label:<TwinNode component={component} state={state} selected={node.id===selectedId}/>}} : node; })); }, [state.latest, state.field_status, selectedId, p.graph.components, setNodes]);
-  const flowEdges = useMemo<Edge[]>(() => p.graph.edges.map(edge => ({ id: edge.id, source: edge.source, target: edge.target, label: edge.label, type: "smoothstep", markerEnd: { type: MarkerType.ArrowClosed, color: relationshipStyle[edge.category]?.color || "#9cbfaf" }, style: { stroke: relationshipStyle[edge.category]?.color || "#9cbfaf", strokeWidth: 1.6 }, labelStyle: { fill: "#b9a9bd", fontSize: 9 }, labelBgStyle: { fill: "#171119", fillOpacity: .88 } })), [p.graph.edges]);
+  const flowEdges = useMemo<Edge[]>(() => p.graph.edges.map(edge => ({ id: edge.id, source: edge.source, target: edge.target, label: edge.label, type: "smoothstep", markerEnd: { type: MarkerType.ArrowClosed, color: relationshipStyle[edge.category]?.color || "var(--success)" }, style: { stroke: relationshipStyle[edge.category]?.color || "var(--success)", strokeWidth: 1.6 }, labelStyle: { fill: "var(--text-secondary)", fontSize: 11 }, labelBgStyle: { fill: "var(--surface)", fillOpacity: .88 } })), [p.graph.edges]);
   const runControl = async (action: string, value: boolean) => {
     setActionBusy(true);
     setActionError("");
@@ -842,10 +851,10 @@ function Twin({ state, selectedId, onSelect, refresh }: { state: State; selected
       <div className="twin-stage">
         <div className="twin twin-canvas" aria-label="Physical system topology">
           <ReactFlow nodes={nodes} edges={flowEdges} onNodesChange={onNodesChange} onNodeClick={(_, node)=>onSelect(node.id)} nodesDraggable nodesConnectable={false} elementsSelectable fitView fitViewOptions={{padding:.2}} minZoom={.45} maxZoom={1.6} proOptions={{hideAttribution:true}}>
-            <Background color="rgba(225,201,232,.08)" gap={24} size={1}/><MiniMap pannable zoomable nodeColor="#4e3856" maskColor="rgba(12,9,14,.72)"/><Controls showInteractive={false}/>
+            <Background color="var(--border-strong)" gap={24} size={1}/><MiniMap pannable zoomable nodeColor="var(--accent)" maskColor="var(--minimap-mask)"/><Controls showInteractive={false}/>
           </ReactFlow>
         </div>
-        <aside className="twin-details" aria-label="Selected component details">
+        <aside ref={inspector} className="twin-details t-panel-slide" data-open="true" aria-label="Selected component details">
           <div className="detail-heading"><span>{componentRegistry[selected.category]?.label || "Component"}{selected.group ? ` / ${selected.group}` : ""}</span><h3>{selected.name || selected.label}</h3><p>{selected.description || "No description provided."}</p></div>
           <div className="detail-section"><h4>Current state</h4>
             {selectedMetrics.length ? selectedMetrics.map(([key, metric]) => {
@@ -855,7 +864,7 @@ function Twin({ state, selectedId, onSelect, refresh }: { state: State; selected
               return <div className="detail-metric" key={key}><span>{metric.label}<small>{metric.source} · {fresh ? "fresh" : state.latest ? "stale" : "waiting"}</small></span><strong>{metricValue(value, metric.precision)} {value !== null && value !== undefined ? metric.unit : ""}</strong>{!metric.calibrated && <small>Calibration unavailable</small>}</div>;
             }) : <p className="detail-empty">This component has static configuration only.</p>}
           </div>
-          {selectedMetrics.some(([, metric]) => metric.data_type === "number") && state.readings.length > 1 && <div className="detail-section"><h4>Recent history</h4><div className="detail-chart"><ResponsiveContainer width="100%" height="100%"><LineChart data={state.readings.map((r) => ({ received: r.received, ...r.readings }))}><Line dataKey={selectedMetrics.find(([, m]) => m.data_type === "number")?.[0]} stroke="#D4ADDF" dot={false} isAnimationActive={false}/><XAxis dataKey="received" hide/><YAxis hide domain={["auto", "auto"]}/><Tooltip labelFormatter={(n) => time(Number(n))}/></LineChart></ResponsiveContainer></div></div>}
+          {selectedMetrics.some(([, metric]) => metric.data_type === "number") && state.readings.length > 1 && <div className="detail-section"><h4>Recent history</h4><div className="detail-chart"><ResponsiveContainer width="100%" height="100%"><LineChart data={state.readings.map((r) => ({ received: r.received, ...r.readings }))}><Line dataKey={selectedMetrics.find(([, m]) => m.data_type === "number")?.[0]} stroke="var(--chart-line)" dot={false} isAnimationActive={false}/><XAxis dataKey="received" hide/><YAxis hide domain={["auto", "auto"]}/><Tooltip labelFormatter={(n) => time(Number(n))}/></LineChart></ResponsiveContainer></div></div>}
           {categoricalMetric && categoricalTransitions.length > 0 && <div className="detail-section"><h4>Recent transitions</h4><p className="detail-empty">Repeated samples are collapsed into state changes.</p><div className="transition-list">{categoricalTransitions.slice(0,transitionLimit).map((reading) => <div key={`${reading.received}-${categoricalMetric[0]}`}><span>{time(reading.received)}</span><strong>{metricValue(reading.readings[categoricalMetric[0]], categoricalMetric[1].precision)}</strong></div>)}</div>{categoricalTransitions.length>5&&<button className="transition-more" type="button" onClick={()=>setTransitionLimit(transitionLimit>=categoricalTransitions.length?5:Math.min(transitionLimit+10,categoricalTransitions.length))}>{transitionLimit>=categoricalTransitions.length?"Show less":`Show more (${categoricalTransitions.length-transitionLimit})`}</button>}</div>}
           <div className="detail-section"><h4>Relationships</h4>{relations.length ? relations.map((edge) => <div className="detail-relation" key={edge.id}><span>{edge.label}</span><strong>{edge.source === selected.id ? p.graph.components.find((c) => c.id === edge.target)?.name : p.graph.components.find((c) => c.id === edge.source)?.name}</strong></div>) : <p className="detail-empty">No relationships defined.</p>}</div>
           {!!Object.keys(selected.configuration).length && <div className="detail-section"><h4>Configuration</h4>{Object.entries(selected.configuration).map(([key, value]) => <div className="detail-relation" key={key}><span>{key.replaceAll("_", " ")}</span><strong>{display(value)}</strong></div>)}</div>}
@@ -1040,6 +1049,7 @@ function GlobalSettings() {
           </p>
         </div>
       </div>
+      <section className="panel appearance-settings"><div><h2>Appearance</h2><p>Choose a theme, or follow your device. Your preference is saved in this browser.</p></div><ThemeSwitcher/></section>
       <section className="panel settings-content">
         <h2>Service availability</h2>
         <div className="measurement">
@@ -1081,6 +1091,6 @@ function GlobalSettings() {
 
 createRoot(document.getElementById("root")!).render(
   <BrowserRouter>
-    <App />
+    <ThemeProvider><App /></ThemeProvider>
   </BrowserRouter>,
 );

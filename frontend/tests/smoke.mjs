@@ -7,7 +7,8 @@ const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
 const errors = [];
 let createdId = "";
 page.on("pageerror", (error) => errors.push(error.message));
-const base = "http://127.0.0.1:8000";
+const base = process.env.AGENTWIN_TEST_URL || "http://127.0.0.1:8000";
+
 const check = (condition, message) => { if (!condition) throw Error(message); };
 try {
   await page.goto(base);
