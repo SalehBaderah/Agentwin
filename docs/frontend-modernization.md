@@ -19,7 +19,7 @@ The audit found presentation and operational logic together in `frontend/src/mai
 | `frontend/tests/*`, `frontend/package.json` | Configurable smoke URL, responsive/theme review, isolated MQTT device fixture and operational browser checks; `test:ui` and `test:operations` scripts. |
 | `.agents/skills/*`, `skills-lock.json` | Requested transitions.dev and transitions-polish installation. |
 
-Glass is limited to navigation, overview summary, dialog and agent surfaces. Opaque surfaces provide the fallback when backdrop filtering is unavailable. Regular data panels remain opaque. The palette uses #0B0B10, #2A253D and #2CA5E0, with independently designed light-theme surfaces and darker cyan text for contrast.
+Glass is limited to navigation, overview summary, dialog and agent surfaces. Opaque surfaces provide the fallback when backdrop filtering is unavailable. Regular data panels remain opaque. The Pearl Slate light palette uses #E9EAF2 for the page, #E1E2EC for secondary areas and #F0F0F6 for normal panels. #D8D5E5 is reserved for raised controls and active states rather than progressively darkening every surface. Light text and accent treatments use #17151F, #4F5363, #737888, #2CA5E0 and #0878AD.
 
 Desktop navigation floats beside a bounded content area and can collapse to labeled icon links. Mobile navigation uses a native modal sheet. Workspace panels stack at narrower widths; tabs scroll horizontally, the Twin inspector moves below the canvas, and forms collapse to one column. Technical IDs, timestamps, freshness, source/session information and statuses remain available.
 

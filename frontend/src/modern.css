@@ -358,6 +358,7 @@ p,
   border-radius: var(--radius-panel);
   background: var(--surface);
   overflow: hidden;
+  margin-top: 1.5px; /* Gives space for the -2px hover transform */
   transition:
     border-color var(--duration-quick),
     transform var(--duration-fast) var(--ease-smooth-out);
@@ -839,7 +840,7 @@ p,
   box-shadow: var(--shadow-dialog);
 }
 .dialog::backdrop {
-  background: rgba(5, 8, 15, 0.58);
+  background: var(--backdrop);
   backdrop-filter: blur(4px);
 }
 .dialog-heading {

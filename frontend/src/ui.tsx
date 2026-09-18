@@ -136,9 +136,8 @@ export function Tabs({
         if (next < 0) return;
         event.preventDefault();
         onChange(items[next][0]);
-        rail.current
-          ?.querySelectorAll<HTMLButtonElement>('[role="tab"]')
-          [next]?.focus();
+        const tabs = rail.current?.querySelectorAll<HTMLButtonElement>('[role="tab"]');
+        tabs?.[next]?.focus();
       }}
     >
       <span className="t-tabs-pill" aria-hidden="true" />

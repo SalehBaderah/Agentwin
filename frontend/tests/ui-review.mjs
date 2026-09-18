@@ -18,7 +18,7 @@ const errors = [],
   overflows = [];
 page.on("pageerror", (error) => errors.push(error.message));
 page.on("console", (message) => {
-  if (message.type() === "error") errors.push(message.text());
+  if (message.type() === "error") errors.push(`${message.location().url || "browser"}: ${message.text()}`);
 });
 let id;
 try {
@@ -116,7 +116,7 @@ try {
         ).toBeVisible();
         await page.evaluate(() => document.fonts.ready);
         if (name === "twin")
-          await page.locator(".react-flow__node").first().waitFor();
+          await page.locator(".live-twin-canvas canvas").first().waitFor();
         await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
         const overflow = await page.evaluate(() => ({
           width: innerWidth,

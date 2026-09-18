@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   BrowserRouter,
@@ -17,7 +17,6 @@ import {
   ArrowUpRight,
   AudioLines,
   Bell,
-  Box,
   Cable,
   Check,
   Copy,
@@ -27,8 +26,6 @@ import {
   Layers,
   LayoutDashboard,
   Radio,
-  Router,
-  Server,
   Plus,
   Power,
   MessageSquare,
@@ -36,7 +33,6 @@ import {
   Send,
   Settings as SettingsIcon,
   ShieldCheck,
-  Zap,
   X,
 } from "lucide-react";
 import {
@@ -48,7 +44,6 @@ import {
   Tooltip,
   CartesianGrid,
 } from "recharts";
-import { Background, Controls, MarkerType, MiniMap, ReactFlow, useNodesState, type Edge, type Node } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import type { Answer, Component, Event as ProjectEvent, Project, State } from "./types";
 import { api, display, strings, time } from "./types";
@@ -60,6 +55,8 @@ import "./styles.css";
 import "./modern.css";
 import { ThemeProvider, ThemeSwitcher } from "./theme";
 import { Dialog, Tabs } from "./ui";
+
+const DigitalTwin = lazy(() => import("./features/digital-twin/DigitalTwin").then((module) => ({ default: module.DigitalTwin })));
 
 function Mark() {
   return (
@@ -611,7 +608,7 @@ function Workspace({ connected }: { connected: boolean }) {
             {tab === "overview" && <ProjectOverview state={state} />}
             {tab === "readings" && <Readings state={state} />}
             {tab === "twin" && (
-              <Twin state={state} selectedId={selectedComponentId} onSelect={setSelectedComponentId} refresh={refresh} />
+              <Suspense fallback={<div className="chart-empty"><Activity/><strong>Loading Live Twin</strong><p>Preparing the operational scene.</p></div>}><DigitalTwin state={state} selectedId={selectedComponentId} onSelect={setSelectedComponentId} refresh={refresh} /></Suspense>
             )}{" "}
             {tab === "events" && <Events state={state} refresh={refresh} />}{" "}
             {tab === "controls" && <ControlsPanel state={state} refresh={refresh} />}
@@ -733,29 +730,6 @@ function AddProject() {
   {step===5&&<div className="form-step"><div className="form-step-heading"><h2>Review configuration</h2><p>Creation is atomic and persists all identities and field contracts.</p></div><dl className="config-summary"><div><dt>Project</dt><dd>{form.name}</dd></div><div><dt>Template</dt><dd>{form.template}</dd></div><div><dt>Devices</dt><dd>{devices.map(d=>`${d.device_id} · ${d.connector}`).join(", ")}</dd></div><div><dt>Components</dt><dd>{components.map(c=>`${c.label} · ${c.pin||"no pin"}`).join(", ")}</dd></div><div><dt>Fields</dt><dd>{components.map(c=>c.field_key||"missing mapping").join(", ")}</dd></div><div><dt>Controls</dt><dd>{components.some(c=>c.component_type==="led")?"LED reported-state control":"Read only"}</dd></div><div><dt>Firmware</dt><dd>{components.map(c=>`${c.component_id}: ${c.component_type==="led"?"set_led handler":c.component_type==="analog"?"analogRead publisher":"field publisher"}`).join("; ")}</dd></div><div><dt>Freshness</dt><dd>{form.freshness_seconds}s · retain {form.retention_days} days</dd></div></dl></div>}
   <div className="form-actions">{step>0&&<button className="tertiary" type="button" onClick={()=>setStep(step-1)}>Back</button>}<button className="primary" disabled={saving}>{step===steps.length-1?saving?"Creating project…":"Create project":"Continue"}</button></div><p role="status">{message}</p></form></main>;
 }
-const componentRegistry: Record<string, { icon: typeof Box; label: string; accent: string }> = {
-  controller: { icon: Zap, label: "Controller", accent: "var(--info)" },
-  actuator: { icon: Activity, label: "Actuator", accent: "var(--relationship-control)" },
-  gateway: { icon: Router, label: "Gateway", accent: "var(--info)" },
-  passive: { icon: Cable, label: "Wired component", accent: "var(--relationship-physical)" },
-  power: { icon: Zap, label: "Ground", accent: "var(--relationship-power)" },
-  software: { icon: Server, label: "Application", accent: "var(--text-secondary)" },
-  generic: { icon: Box, label: "Component", accent: "var(--text-muted)" },
-};
-
-const typeIcons: Record<string, typeof Box> = {
-  edge_controller: Zap,
-  indicator_led: Activity,
-  telemetry_gateway: Router,
-  resistor: Cable,
-  ground: Zap,
-  operations_service: Server,
-};
-
-const relationshipStyle: Record<string, { color: string }> = {
-  physical: { color: "var(--relationship-physical)" }, control: { color: "var(--relationship-control)" }, data: { color: "var(--accent)" }, power: { color: "var(--relationship-power)" }, context: { color: "var(--success)" },
-};
-
 function metricValue(value: unknown, precision: number) {
   if (value === null || value === undefined) return "Unavailable";
   if (typeof value === "number") return value.toLocaleString("en-US", { maximumFractionDigits: precision });
@@ -774,107 +748,6 @@ function controlReady(state: State, project: Project, control: { expected: { fie
   return !!device && (device.connector === "usb" ? device.online : device.reporting);
 }
 
-function TwinNode({ component, state, selected }: { component: Component; state: State; selected: boolean }) {
-  const registry = componentRegistry[component.category] || componentRegistry.generic;
-  const Icon = typeIcons[component.type] || registry.icon;
-  const metrics = Object.entries(state.project.graph.fields).filter(([key, metric]) => isVisibleMetric(key) && metric.component_id === component.id).slice(0, 2);
-  const passive = component.category === "passive";
-  const freshnessLimit = metrics.length ? Math.min(...metrics.map(([, metric]) => metric.freshness_seconds || state.project.freshness_seconds)) : state.project.freshness_seconds;
-  const fresh = !!state.latest && Date.now() / 1000 - state.latest.received <= freshnessLimit;
-  const stateLabel = passive ? "Configured" : !state.latest ? "Waiting for data" : fresh ? "Fresh" : "Stale";
-  return (
-    <div className={`twin-node ${selected ? "is-selected" : ""}`} style={{ "--node-accent": registry.accent } as React.CSSProperties}>
-      <div className="twin-node-heading"><span className="twin-node-icon"><Icon size={16}/></span><span>{registry.label}</span>{component.group && <em>{component.group}</em>}</div>
-      <strong>{component.name || component.label}</strong>
-      <div className="twin-node-values">
-        {metrics.length ? metrics.map(([key, metric]) => <span key={key}><b>{metricValue(state.latest?.readings[key], metric.precision)}</b>{metric.unit && ` ${metric.unit}`}</span>) : <span>{component.group || "No live measurements"}</span>}
-      </div>
-      <small className={`node-state ${stateLabel.toLowerCase().replaceAll(" ", "-")}`}>{stateLabel}</small>
-    </div>
-  );
-}
-
-function Twin({ state, selectedId, onSelect, refresh }: { state: State; selectedId: string | null; onSelect: (id: string) => void; refresh: () => void }) {
-  const [actionBusy, setActionBusy] = useState(false);
-  const [actionError, setActionError] = useState("");
-  const [transitionLimit, setTransitionLimit] = useState(5);
-  const p = state.project;
-  const defaultComponent = p.graph.components.find((component) => component.id === "led") || p.graph.components[0];
-  const selected = p.graph.components.find((component) => component.id === selectedId) || defaultComponent;
-  useEffect(() => { if (!selectedId && defaultComponent) onSelect(defaultComponent.id); }, [selectedId, defaultComponent, onSelect]);
-  useEffect(() => { setTransitionLimit(5); }, [selected.id]);
-  const inspector = useRef<HTMLElement>(null);
-  useEffect(() => {
-    const panel = inspector.current;
-    if (!panel) return;
-    panel.dataset.open = "false";
-    void panel.offsetWidth;
-    const frame = requestAnimationFrame(() => { panel.dataset.open = "true"; });
-    return () => cancelAnimationFrame(frame);
-  }, [selected.id]);
-  const selectedMetrics = Object.entries(p.graph.fields).filter(([key, metric]) => isVisibleMetric(key) && metric.component_id === selected.id);
-  const categoricalMetric = selectedMetrics.find(([, metric]) => metric.data_type !== "number");
-  const categoricalTransitions = categoricalMetric ? state.readings.filter((reading,index,all)=>index===0 || reading.readings[categoricalMetric[0]]!==all[index-1].readings[categoricalMetric[0]]).reverse() : [];
-  const relations = p.graph.edges.filter((edge) => edge.source === selected.id || edge.target === selected.id);
-  const relatedEvents = state.events.filter((event) => event.evidence.readings.some((reading) => selectedMetrics.some(([key]) => key in reading.readings)));
-  const legend = [...new Map(p.graph.edges.map((edge) => [edge.category, edge])).values()];
-  const initialNodes = useMemo<Node[]>(() => {
-    const lanes: Record<string, number> = { Components: 0, Devices: 1, Transport: 2 };
-    const laneCounts: Record<number, number> = {};
-    return p.graph.components.map((component) => {
-      const lane = lanes[component.group || ""] ?? 1; const row = laneCounts[lane] || 0; laneCounts[lane] = row + 1;
-      return { id: component.id, position: { x: 50 + lane * 280, y: 70 + row * 160 }, data: { label: <TwinNode component={component} state={state} selected={false}/> }, style: { padding: 0, border: 0, background: "transparent", width: 220 } };
-    });
-  }, [p.id]);
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
-  useEffect(() => { setNodes(current => current.map(node => { const component = p.graph.components.find(item => item.id === node.id); return component ? {...node, data:{label:<TwinNode component={component} state={state} selected={node.id===selectedId}/>}} : node; })); }, [state.latest, state.field_status, selectedId, p.graph.components, setNodes]);
-  const flowEdges = useMemo<Edge[]>(() => p.graph.edges.map(edge => ({ id: edge.id, source: edge.source, target: edge.target, label: edge.label, type: "smoothstep", markerEnd: { type: MarkerType.ArrowClosed, color: relationshipStyle[edge.category]?.color || "var(--success)" }, style: { stroke: relationshipStyle[edge.category]?.color || "var(--success)", strokeWidth: 1.6 }, labelStyle: { fill: "var(--text-secondary)", fontSize: 11 }, labelBgStyle: { fill: "var(--surface)", fillOpacity: .88 } })), [p.graph.edges]);
-  const runControl = async (action: string, value: boolean) => {
-    setActionBusy(true);
-    setActionError("");
-    try {
-      await api(`/projects/${p.id}/sessions/${state.session.id}/actions`, { component_id: selected.id, action, value });
-      refresh();
-    } catch (error) {
-      setActionError((error as Error).message);
-    } finally {
-      setActionBusy(false);
-    }
-  };
-  const selectedActions = state.actions.filter((action) => action.target === selected.id);
-  return (
-    <div className="twin-workspace">
-      <div className="twin-toolbar">
-        <div><h3>System topology</h3><p>{p.graph.components.length} components · {p.graph.edges.length} relationships · schema v{p.graph.schema_version}</p></div>
-        <div className="twin-legend" aria-label="Relationship legend">{legend.map((edge) => <span key={edge.category}><i style={{ background: relationshipStyle[edge.category]?.color }}/>{edge.category}</span>)}</div>
-      </div>
-      <div className="twin-stage">
-        <div className="twin twin-canvas" aria-label="Physical system topology">
-          <ReactFlow nodes={nodes} edges={flowEdges} onNodesChange={onNodesChange} onNodeClick={(_, node)=>onSelect(node.id)} nodesDraggable nodesConnectable={false} elementsSelectable fitView fitViewOptions={{padding:.2}} minZoom={.45} maxZoom={1.6} proOptions={{hideAttribution:true}}>
-            <Background color="var(--border-strong)" gap={24} size={1}/><MiniMap pannable zoomable nodeColor="var(--accent)" maskColor="var(--minimap-mask)"/><Controls showInteractive={false}/>
-          </ReactFlow>
-        </div>
-        <aside ref={inspector} className="twin-details t-panel-slide" data-open="true" aria-label="Selected component details">
-          <div className="detail-heading"><span>{componentRegistry[selected.category]?.label || "Component"}{selected.group ? ` / ${selected.group}` : ""}</span><h3>{selected.name || selected.label}</h3><p>{selected.description || "No description provided."}</p></div>
-          <div className="detail-section"><h4>Current state</h4>
-            {selectedMetrics.length ? selectedMetrics.map(([key, metric]) => {
-              const value = state.latest?.readings[key];
-              const freshFor = metric.freshness_seconds || p.freshness_seconds;
-              const fresh = !!state.latest && Date.now() / 1000 - state.latest.received <= freshFor;
-              return <div className="detail-metric" key={key}><span>{metric.label}<small>{metric.source} · {fresh ? "fresh" : state.latest ? "stale" : "waiting"}</small></span><strong>{metricValue(value, metric.precision)} {value !== null && value !== undefined ? metric.unit : ""}</strong>{!metric.calibrated && <small>Calibration unavailable</small>}</div>;
-            }) : <p className="detail-empty">This component has static configuration only.</p>}
-          </div>
-          {selectedMetrics.some(([, metric]) => metric.data_type === "number") && state.readings.length > 1 && <div className="detail-section"><h4>Recent history</h4><div className="detail-chart"><ResponsiveContainer width="100%" height="100%"><LineChart data={state.readings.map((r) => ({ received: r.received, ...r.readings }))}><Line dataKey={selectedMetrics.find(([, m]) => m.data_type === "number")?.[0]} stroke="var(--chart-line)" dot={false} isAnimationActive={false}/><XAxis dataKey="received" hide/><YAxis hide domain={["auto", "auto"]}/><Tooltip labelFormatter={(n) => time(Number(n))}/></LineChart></ResponsiveContainer></div></div>}
-          {categoricalMetric && categoricalTransitions.length > 0 && <div className="detail-section"><h4>Recent transitions</h4><p className="detail-empty">Repeated samples are collapsed into state changes.</p><div className="transition-list">{categoricalTransitions.slice(0,transitionLimit).map((reading) => <div key={`${reading.received}-${categoricalMetric[0]}`}><span>{time(reading.received)}</span><strong>{metricValue(reading.readings[categoricalMetric[0]], categoricalMetric[1].precision)}</strong></div>)}</div>{categoricalTransitions.length>5&&<button className="transition-more" type="button" onClick={()=>setTransitionLimit(transitionLimit>=categoricalTransitions.length?5:Math.min(transitionLimit+10,categoricalTransitions.length))}>{transitionLimit>=categoricalTransitions.length?"Show less":`Show more (${categoricalTransitions.length-transitionLimit})`}</button>}</div>}
-          <div className="detail-section"><h4>Relationships</h4>{relations.length ? relations.map((edge) => <div className="detail-relation" key={edge.id}><span>{edge.label}</span><strong>{edge.source === selected.id ? p.graph.components.find((c) => c.id === edge.target)?.name : p.graph.components.find((c) => c.id === edge.source)?.name}</strong></div>) : <p className="detail-empty">No relationships defined.</p>}</div>
-          {!!Object.keys(selected.configuration).length && <div className="detail-section"><h4>Configuration</h4>{Object.entries(selected.configuration).map(([key, value]) => <div className="detail-relation" key={key}><span>{key.replaceAll("_", " ")}</span><strong>{display(value)}</strong></div>)}</div>}
-          <div className="detail-section"><h4>Events and actions</h4><p className="detail-empty">{relatedEvents.length ? `${relatedEvents.length} related event${relatedEvents.length === 1 ? "" : "s"}` : "No related events in this session."}</p>{selected.controls?.length ? <>{selected.controls.map((control) => <div className="component-actions" key={control.action}><button disabled={actionBusy || !controlReady(state, p, control)} onClick={() => runControl(control.action, true)}>{control.action === "set_led" ? "Turn on" : control.label}</button><button disabled={actionBusy || !controlReady(state, p, control)} onClick={() => runControl(control.action, false)}>{control.action === "set_led" ? "Turn off" : "Disable"}</button></div>)}{!selected.controls.every((control) => controlReady(state, p, control)) && <p className="detail-empty">Connect the configured live transport before controlling this component.</p>}{actionError && <p className="error">{actionError}</p>}{selectedActions.slice(0, 3).map((action) => <div className="detail-relation" key={action.id}><span>{action.action.replace(":", " ")}</span><strong>{action.status.replace("_", " ")}</strong></div>)}</> : <p className="detail-empty">No hardware controls are configured for this component.</p>}</div>
-          <p className="detail-footnote">{state.session.mode} source · last update {time(state.latest?.received)}. This is a live operational representation, not a predictive model.</p>
-        </aside>
-      </div>
-    </div>
-  );
-}
 function Events({ state, refresh }: { state: State; refresh: () => void }) {
   const [selected, setSelected] = useState<ProjectEvent | null>(null),
     [error, setError] = useState("");

@@ -1,0 +1,220 @@
+:root {
+  --tabs-dur: 250ms;
+  --tabs-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --tabs-text-muted: rgba(15, 15, 15, 0.8);
+  --tabs-text-active: #0f0f0f;
+  --tabs-bar-bg: #f1f1f1;
+  --tabs-pill-bg: #ffffff;
+}
+
+/* The bar is just a flex container with padding for the pill
+   to sit inside. Tabs sit on z-index: 1, the pill on z-index: 0,
+   so labels read above the pill background. */
+.t-tabs {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px;
+  border-radius: 48px;
+  background: var(--tabs-bar-bg);
+}
+.t-tab {
+  position: relative;
+  appearance: none;
+  border: 0;
+  background: transparent;
+  height: 30px;
+  padding: 4px 12px;
+  color: var(--tabs-text-muted);
+  cursor: pointer;
+  border-radius: 48px;
+  z-index: 1;
+  transition: color var(--tabs-dur) var(--tabs-ease);
+}
+.t-tab:not([aria-selected="true"]):hover,
+.t-tab[aria-selected="true"] {
+  color: var(--tabs-text-active);
+}
+
+/* The pill: width + transform are written inline by JS so
+   the transition tweens between the previous and next
+   measured positions. */
+.t-tabs-pill {
+  position: absolute;
+  top: 3px;
+  left: 0;
+  height: 30px;
+  width: 0;
+  background: var(--tabs-pill-bg);
+  border-radius: 48px;
+  transform: translateX(0);
+  transition:
+    transform var(--tabs-dur) var(--tabs-ease),
+    width     var(--tabs-dur) var(--tabs-ease);
+  will-change: transform, width;
+  z-index: 0;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .t-tabs-pill, .t-tab { transition: none !important; }
+}
+
+.live-twin-workspace {
+  --tabs-text-muted: var(--text-muted);
+  --tabs-text-active: var(--text-primary);
+  --tabs-bar-bg: var(--background);
+  --tabs-pill-bg: var(--surface-elevated);
+  position: relative;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.live-twin-header {
+  min-height: 82px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 15px 18px;
+  border-bottom: 1px solid var(--border);
+}
+.live-twin-header h3 { margin: 3px 0 2px; font-size: 17px; }
+.live-twin-header p { margin: 0; color: var(--text-muted); font-size: 12px; }
+.session-kicker { color: var(--text-muted); font-size: 10px; font-weight: 750; letter-spacing: .1em; }
+.session-kicker.live { color: var(--success); }
+.session-kicker.simulation, .session-kicker.replay { color: var(--warning); }
+.twin-view-switch { flex: 0 0 auto; }
+
+.twin-status-bar {
+  min-height: 43px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 9px 18px;
+  color: var(--text-muted);
+  background: var(--background);
+  border-bottom: 1px solid var(--border);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.twin-status-bar > span { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.twin-health { color: var(--text-primary); font-weight: 700; }
+.twin-health i { width: 7px; height: 7px; border-radius: 50%; background: var(--text-muted); }
+.twin-health.fresh i, .twin-health.aging i { background: var(--success); }
+.twin-health.stale i { background: var(--warning); }
+
+.twin-view-frame { min-height: 560px; animation: twin-view-in var(--duration-fast) var(--ease-smooth-out); }
+@keyframes twin-view-in { from { opacity: .45; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+.live-twin-stage { display: grid; grid-template-columns: minmax(0, 1fr) 318px; height: 560px; }
+.live-twin-canvas { position: relative; min-width: 0; height: 560px; overflow: hidden; background: var(--background); border-right: 1px solid var(--border); touch-action: none; }
+.live-twin-canvas canvas { outline: none; }
+
+.twin-zoom-controls {
+  position: absolute;
+  left: 14px;
+  bottom: 14px;
+  display: flex;
+  padding: 3px;
+  border: 1px solid var(--border-strong);
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  box-shadow: 0 8px 24px var(--shadow-color);
+  backdrop-filter: blur(10px);
+}
+.twin-zoom-controls button { width: 36px; min-height: 34px; padding: 0; display: grid; place-items: center; color: var(--text-secondary); border: 0; border-radius: 6px; background: transparent; }
+.twin-zoom-controls button:hover { color: var(--text-primary); background: var(--surface-hover); }
+.twin-zoom-controls button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+.live-twin-inspector {
+  position: relative;
+  min-width: 0;
+  height: 560px;
+  overflow: auto;
+  background: var(--surface);
+  scrollbar-width: thin;
+  --panel-translate-y: 18px;
+}
+.inspector-close { position: absolute; top: 12px; right: 12px; z-index: 2; width: 32px; min-height: 32px; padding: 0; display: grid; place-items: center; color: var(--text-muted); border: 1px solid var(--border); border-radius: 7px; background: var(--surface-elevated); }
+.inspector-heading { padding: 19px 48px 17px 18px; border-bottom: 1px solid var(--border); }
+.inspector-heading > span { color: var(--accent); font-size: 11px; text-transform: capitalize; }
+.inspector-heading h3 { margin: 5px 0; font-size: 16px; }
+.inspector-heading p, .inspector-footnote { margin: 0; color: var(--text-muted); font-size: 12px; line-height: 1.5; }
+.live-twin-inspector details { border-bottom: 1px solid var(--border); }
+.live-twin-inspector summary { padding: 13px 18px; color: var(--text-secondary); cursor: pointer; font-size: 11px; font-weight: 750; list-style-position: outside; }
+.live-twin-inspector summary:hover { color: var(--text-primary); }
+.inspector-content { padding: 0 18px 15px; }
+.inspector-metric { display: flex; justify-content: space-between; gap: 12px; padding: 9px 0; border-top: 1px solid var(--border); font-size: 12px; }
+.inspector-metric:first-child { border-top: 0; }
+.inspector-metric > span { color: var(--text-secondary); }
+.inspector-metric small, .detail-relation small { display: block; margin-top: 3px; color: var(--text-muted); font-size: 10px; font-weight: 400; }
+.inspector-metric > strong { color: var(--text-primary); text-align: right; font-variant-numeric: tabular-nums; }
+.evidence-list { display: grid; gap: 10px; }
+.evidence-list p { display: grid; grid-template-columns: 16px 1fr; gap: 8px; margin: 0; color: var(--success); font-size: 12px; }
+.evidence-list p.muted { color: var(--text-muted); }
+.evidence-list p span { color: var(--text-muted); }
+.evidence-list p strong { display: block; margin-bottom: 2px; color: var(--text-primary); }
+.operational-callout { display: flex; gap: 8px; padding: 10px; color: var(--warning); border: 1px solid var(--warning-border); border-radius: 8px; background: var(--warning-subtle); font-size: 11px; }
+.operational-callout strong { display: block; color: var(--text-primary); text-transform: capitalize; }
+.inspector-footnote { padding: 15px 18px; }
+.inspector-backdrop { display: none; }
+
+.topology-view { position: relative; min-height: 560px; }
+.topology-view .twin { height: 560px; }
+.topology-note { position: absolute; z-index: 4; top: 14px; left: 14px; padding: 7px 10px; color: var(--text-muted); border: 1px solid var(--border); border-radius: 7px; background: color-mix(in srgb, var(--surface) 90%, transparent); font-size: 11px; backdrop-filter: blur(8px); }
+
+.twin-activity { display: grid; grid-template-columns: 140px minmax(0, 1fr); gap: 14px; align-items: center; min-height: 84px; padding: 13px 18px; border-top: 1px solid var(--border); background: var(--surface); }
+.twin-activity > div strong, .twin-activity > div span { display: block; }
+.twin-activity > div strong { font-size: 12px; }
+.twin-activity > div span, .twin-activity > p { margin: 3px 0 0; color: var(--text-muted); font-size: 10px; }
+.twin-activity ol { display: flex; gap: 6px; margin: 0; padding: 0; overflow-x: auto; list-style: none; scrollbar-width: thin; }
+.twin-activity li { min-width: 126px; display: grid; grid-template-columns: 7px 1fr; gap: 6px; padding: 8px 9px; border-left: 1px solid var(--border); font-size: 10px; }
+.twin-activity li > i { width: 6px; height: 6px; margin-top: 3px; border-radius: 50%; background: var(--accent); }
+.twin-activity li > i.command { background: var(--warning); }
+.twin-activity li > i.event { background: var(--relationship-control); }
+.twin-activity li span { color: var(--text-secondary); }
+.twin-activity li small, .twin-activity time { display: block; color: var(--text-muted); font-size: 9px; }
+.twin-activity time { grid-column: 2; }
+.live-twin-workspace > .twin-legend { padding: 9px 18px; justify-content: flex-start; border-top: 1px solid var(--border); background: var(--background); }
+.live-twin-workspace > .twin-legend span { font-size: 10px; }
+.live-twin-workspace > .twin-legend i { background: var(--accent); }
+.live-twin-workspace > .twin-legend .physical i { background: var(--relationship-physical); }
+.live-twin-workspace > .twin-legend .control i { height: 1px; background: repeating-linear-gradient(90deg, var(--relationship-control) 0 3px, transparent 3px 5px); }
+.live-twin-workspace > .twin-legend .power i { background: var(--relationship-power); }
+
+@media (max-width: 1024px) {
+  .live-twin-stage { grid-template-columns: minmax(0, 1fr) 288px; }
+  .twin-status-bar { gap: 13px; }
+}
+
+@media (max-width: 760px) {
+  .live-twin-header { align-items: flex-start; flex-direction: column; gap: 12px; }
+  .twin-view-switch { width: 100%; }
+  .twin-view-switch .t-tab { flex: 1; }
+  .twin-status-bar { padding-inline: 14px; }
+  .live-twin-stage { display: block; height: 480px; }
+  .live-twin-canvas { height: 480px; border-right: 0; }
+  .live-twin-inspector { position: fixed; z-index: 80; left: 0; right: 0; bottom: 0; height: min(72vh, 620px); max-height: calc(100vh - 68px); border-top: 1px solid var(--border-strong); border-radius: 16px 16px 0 0; box-shadow: 0 -18px 48px rgba(0, 0, 0, .32); --panel-translate-y: 100px; }
+  .inspector-backdrop { position: fixed; z-index: 79; inset: 0; display: block; border: 0; background: rgba(0, 0, 0, .45); }
+  .twin-activity { grid-template-columns: 1fr; }
+  .topology-view, .topology-view .twin, .twin-view-frame { min-height: 480px; height: 480px; }
+  .topology-note { max-width: calc(100% - 28px); }
+}
+
+@media (max-width: 430px) {
+  .live-twin-workspace { border-inline: 0; border-radius: 0; }
+  .live-twin-header, .twin-activity, .live-twin-workspace > .twin-legend { padding-inline: 14px; }
+  .live-twin-stage, .live-twin-canvas { height: 430px; }
+  .twin-zoom-controls { left: 10px; bottom: 10px; }
+  .twin-zoom-controls button { width: 40px; min-height: 40px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .twin-view-frame { animation: none; }
+}

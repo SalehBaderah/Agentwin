@@ -43,11 +43,15 @@ try {
   await page.getByRole("tab", { name: "Live readings" }).click();
   await page.getByRole("heading", { name: "Readings" }).waitFor();
   await page.getByRole("tab", { name: "Digital twin" }).click();
-  await page.locator(".react-flow__node").first().waitFor();
-  await check(await page.locator(".react-flow__node").count() >= 3, "Physical topology nodes were not rendered");
-  await page.locator(".react-flow__node").filter({ hasText: "USB connector" }).click();
+  await page.locator(".live-twin-canvas canvas").first().waitFor();
+  await page.screenshot({ path: output + "/platform-live-twin.png", fullPage: true });
+  await page.getByRole("button", { name: /USB connector/ }).focus();
+  await page.keyboard.press("Enter");
   await page.getByRole("heading", { name: "USB connector", exact: true }).waitFor();
   await page.getByLabel("Selected component details").waitFor();
+  await page.getByRole("tab", { name: "Topology", exact: true }).click();
+  await page.locator(".react-flow__node").first().waitFor();
+  await check(await page.locator(".react-flow__node").count() >= 3, "Configured topology nodes were not rendered");
   await page.screenshot({ path: output + "/platform-laptop.png", fullPage: true });
   await page.goto(base);
   await page.getByRole("heading", { name: "Systems at a glance" }).waitFor();
@@ -55,6 +59,7 @@ try {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(base + "/projects/" + createdId);
   await page.getByRole("tab", { name: "Digital twin" }).click();
+  await page.locator(".live-twin-canvas canvas").first().waitFor();
   await check(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "Horizontal overflow on mobile Twin");
   await page.screenshot({ path: output + "/platform-mobile.png", fullPage: true });
   await check(errors.length === 0, `Browser errors: ${errors.join("\n")}`);

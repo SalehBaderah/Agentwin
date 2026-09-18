@@ -1,5 +1,9 @@
 export type Reading = {
   id: number;
+  device?: string;
+  boot?: string;
+  seq?: number;
+  uptime?: number;
   received: number;
   readings: Record<string, number | boolean | string | null>;
   original: null | { received: number };

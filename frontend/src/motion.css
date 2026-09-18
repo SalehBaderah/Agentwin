@@ -38,10 +38,10 @@
 :root {
   --tabs-dur: 250ms;
   --tabs-ease: cubic-bezier(0.22, 1, 0.36, 1);
-  --tabs-text-muted: rgba(15, 15, 15, 0.8);
-  --tabs-text-active: #0f0f0f;
-  --tabs-bar-bg: #f1f1f1;
-  --tabs-pill-bg: #ffffff;
+  --tabs-text-muted: var(--text-secondary);
+  --tabs-text-active: var(--text-primary);
+  --tabs-bar-bg: var(--background-secondary);
+  --tabs-pill-bg: var(--surface);
 }
 
 /* The bar is just a flex container with padding for the pill
