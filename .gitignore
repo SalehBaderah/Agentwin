@@ -10,6 +10,7 @@ artifacts/
 firmware/projects/*/secrets.h
 broker/passwords
 broker/acl
+broker/private-network.conf
 *.tsbuildinfo
 .pytest-tmp
 *-live.log

@@ -26,6 +26,8 @@ AgentwinCore agentwin(ProjectConfig::PROJECT_ID, ProjectConfig::DEVICE_ID,
                       transport, drivers, 1);
 
 void setup() {
+  pinMode(LED_BUILTIN, OUTPUT);
+  digitalWrite(LED_BUILTIN, HIGH);  // Shows that battery power reached setup().
   char bootId[48];
   UnoR4BootId::create(ProjectConfig::BOOT_PREFIX, bootId, sizeof(bootId));
   network.begin();
@@ -36,4 +38,8 @@ void loop() {
   network.loop();
   transport.setNetworkAvailable(network.connected());
   agentwin.loop(millis());
+  // Built-in D13 LED: solid = MQTT, slow blink = Wi-Fi only, fast blink = no Wi-Fi.
+  const unsigned long blinkPeriodMs = network.connected() ? 500 : 150;
+  digitalWrite(LED_BUILTIN, transport.connected() ? HIGH :
+               ((millis() / blinkPeriodMs) % 2 == 0 ? HIGH : LOW));
 }

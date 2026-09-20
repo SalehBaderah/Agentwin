@@ -2,36 +2,95 @@
 
 **Every system. Its own agent.** A local IoT monitoring MVP with an Obsidian Plum React interface, persistent FastAPI backend, project-scoped agent tools, simulation, replay, MQTT ingestion, and a USB gateway.
 
-> For the current multi-project workflow, architecture, and device onboarding process, use the [Platform Overview](docs/platform-overview.md).
+Two physical projects share one backend and MQTT broker:
 
-The first physical acceptance path controls an external LED on UNO R4 pin D7 through the live USB gateway and confirms the result through device telemetry. Simulation remains available as an explicitly selected test source. No physical test is claimed until the wiring procedure is performed.
+| Project | Board | Connection | Local project ID |
+| --- | --- | --- | --- |
+| `arduino_uno_d13_led` | Classic UNO, built-in D13 LED | USB on `COM4` -> Python gateway -> MQTT | `project-1b000f5096` |
+| `R4_jamming_detector` | UNO R4 WiFi, AD8313 on A5 | Wi-Fi -> MQTT; USB-C is for flashing/power | `project-6309ff857a` |
 
-## Run locally (Windows primary path)
+COM ports, project IDs, and LAN IPs can change. Confirm them on your machine. Use each project's **Live** session for physical readings; simulation is separate.
 
-Prerequisites: Python 3.14 and Node 24 were used for verification. Install dependencies from the repository root:
+## Run both projects (Windows PowerShell)
+
+Run commands from the repository root. On a fresh checkout, install and build once:
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.lock
 npm.cmd --prefix frontend ci
 npm.cmd --prefix frontend run build
-Copy-Item .env.example .env
-.\.venv\Scripts\python.exe -m uvicorn backend.main:app --host 127.0.0.1 --port 8000
 ```
 
-Open **http://127.0.0.1:8000**. Select Smart Systems Connectivity → **Start normal**. Neither Docker, connected hardware, nor an LLM key is needed for simulation. Alternatively `powershell -File scripts/start.ps1` starts an already built app. Avoid overwriting an existing `.env` when repeating setup.
+Create `.env` from `.env.example` only if it does not exist. Also create `broker/private-network.conf` from its `.example`, `broker/acl`, `broker/passwords`, and R4 `secrets.h` from `secrets.example.h`. These files are ignored by Git. Do not overwrite working credentials or copy password **hashes** from `broker/passwords` into `.env` or firmware.
 
-On Linux/macOS use `.venv/bin/python` and `npm` instead of the Windows executable paths. That OS path has not been executed in this Windows environment.
-
-For frontend development, keep the backend running and use `npm.cmd --prefix frontend run dev`, then http://127.0.0.1:5173. Vite proxies API/WebSocket traffic; the production build is served by FastAPI. Restart FastAPI after the first frontend build so static routes are registered.
-
-Optional real-device broker:
+For daily use, open separate PowerShell windows for the broker, backend, and classic UNO gateway:
 
 ```powershell
 docker compose up -d broker
 ```
 
-Compose binds Mosquitto only to `127.0.0.1:1883`. The backend retries broker connection independently. A native Mosquitto process is also supported. See the [Platform Overview](docs/platform-overview.md) for architecture, firmware structure, wiring workflow, and new-project setup.
+```powershell
+.\.venv\Scripts\python.exe -m uvicorn backend.main:app --host 127.0.0.1 --port 8000
+```
+
+```powershell
+.\.venv\Scripts\python.exe -m gateway.serial_gateway --port COM4 --baud 38400 --project project-1b000f5096 --device uno-d13-01
+```
+
+Open **http://127.0.0.1:8000**. Keep the classic UNO on USB and run **one** gateway for it. The R4 publishes directly over Wi-Fi, including on battery; **do not run a serial gateway for the R4**. Close Arduino Serial Monitor while the gateway owns the UNO port.
+
+### MQTT setup (once)
+
+Use `ipconfig` to find the computer's LAN IPv4 address. In `.env`, set `MQTT_HOST` and `MQTT_BIND_IP` to that address, `MQTT_PORT=1883`, `MQTT_USERNAME=agentwin-backend`, and its **plain** `MQTT_PASSWORD`. The backend and USB gateway share this account. In R4 `secrets.h`, set your Wi-Fi credentials and the same MQTT host/port; use `#define MQTT_USER "r4-rf-01"` and `#define MQTT_PASSWORD "plain-r4-password"` with C++ quotes. The R4 must be on a network that can reach the computer; allow inbound TCP 1883 on the Windows **Private** network only.
+
+Create the broker accounts. Both commands prompt for passwords. The first command's `-c` **replaces** an existing password file, so use it only on first setup; omit `-c` when resetting or adding accounts:
+
+```powershell
+docker run --rm -it -v "${PWD}\broker:/mosquitto/config" --entrypoint mosquitto_passwd eclipse-mosquitto:2.0.22 -c /mosquitto/config/passwords agentwin-backend
+docker run --rm -it -v "${PWD}\broker:/mosquitto/config" --entrypoint mosquitto_passwd eclipse-mosquitto:2.0.22 /mosquitto/config/passwords r4-rf-01
+```
+
+Put these permissions in ignored `broker/acl` (replace project IDs if yours differ). The classic UNO gateway shares the backend account, so it needs **write** permission for the UNO topics:
+
+```text
+user agentwin-backend
+topic read agentwin/+/+/telemetry
+topic read agentwin/+/+/status
+topic write agentwin/+/+/command
+topic read agentwin/project-1b000f5096/uno-d13-01/command
+topic write agentwin/project-1b000f5096/uno-d13-01/telemetry
+topic write agentwin/project-1b000f5096/uno-d13-01/status
+
+user r4-rf-01
+topic write agentwin/project-6309ff857a/r4-rf-01/telemetry
+topic write agentwin/project-6309ff857a/r4-rf-01/status
+topic read agentwin/project-6309ff857a/r4-rf-01/command
+```
+
+Restart the broker after editing `broker/acl` or `broker/passwords`.
+
+### Flash a board when its firmware changes
+
+Connect the board by USB, close Serial Monitor, and stop the classic UNO gateway if it owns that board's COM port. The Arduino IDE includes `arduino-cli` at this path; use `board list` to confirm which COM port belongs to which board. Compile and upload only the board you changed:
+
+```powershell
+$cli = "$env:LOCALAPPDATA\Programs\Arduino IDE\resources\app\lib\backend\resources\arduino-cli.exe"
+& $cli board list
+& $cli compile --fqbn arduino:avr:uno --libraries firmware/libraries firmware/projects/arduino_uno_d13_led
+& $cli upload --port COM4 --fqbn arduino:avr:uno firmware/projects/arduino_uno_d13_led
+& $cli compile --fqbn arduino:renesas_uno:unor4wifi --libraries firmware/libraries firmware/projects/R4_jamming_detector
+& $cli upload --port COM3 --fqbn arduino:renesas_uno:unor4wifi firmware/projects/R4_jamming_detector
+```
+
+The classic UNO firmware and gateway must both use **38400 baud**. After uploading it, restart the gateway. The R4 needs no gateway; reflash it after changing `secrets.h` or firmware. Its built-in D13 LED is a connection indicator: **fast blink** = no Wi-Fi, **slow blink** = Wi-Fi but no MQTT, **solid** = MQTT connected. If it never lights on battery, check power first. The AD8313 provides a detector voltage and MLP output, not a calibrated frequency spectrum. See the [R4 hardware notes](firmware/projects/R4_jamming_detector/README.md).
+
+### Quick checks
+
+- `http://127.0.0.1:8000/api/health` should show `"mqtt": true`; both projects should show fresh **Live** readings.
+- Broker `not authorised`: check the account's **plain** password, not the hash in `broker/passwords`. Restart broker after resetting it; restart backend/gateway after `.env` edits; reflash R4 after `secrets.h` edits.
+- UNO gateway warnings: confirm its COM port, close Serial Monitor, and match the 38400-baud firmware. The battery-powered R4 does not use a COM port.
+- MQTT connected but UNO not reporting: check the `agentwin-backend` ACL's **write** permission for the UNO telemetry/status topics.
 
 ## What works
 
@@ -50,9 +109,9 @@ Compose binds Mosquitto only to `127.0.0.1:1883`. The backend retries broker con
 
 ```mermaid
 flowchart LR
-  USB[UNO R4 USB] --> GW[Host Python gateway]
+  USB[Classic UNO D13 USB] --> GW[Host Python gateway]
   GW --> MQ[Local Mosquitto]
-  WIFI[UNO R4 Wi-Fi] --> MQ
+  WIFI[UNO R4 RF detector Wi-Fi] --> MQ
   MQ --> ING[Validation / Store.ingest]
   SIM[Deterministic simulator] --> ING
   REP[Selected recording replay] --> ING
@@ -79,13 +138,13 @@ Only server-generated references to stored readings/events render as evidence. T
 
 ## Configuration and assumptions
 
-The attached build prompt overrides the original IDRAK briefs: public name **Agentwin**, track **AI and Data**, first showcase **Smart Systems Connectivity / اتصال الأنظمة الذكية**, UNO R4 WiFi + AD8313 and passive RF inventory. The original three reference Markdown documents remain intact.
+The two device identities and telemetry fields are configured per project in the web app. Their matching firmware identities are in each project's `project_config.h`.
 
 - Default freshness 8 seconds, sampling 1 second, high detector limit 1.6 V; these are demo defaults, not measured operating limits. Generic seed uses °C and limit 30, explicitly synthetic. A new project defines its own unit/field/limit.
 - Overview and project routes use **live** sessions by default. Simulation remains available from the source selector and never replaces a disconnected live source.
 - Each telemetry packet explicitly registers its boot session. A newly observed boot can arrive late, retires the prior boot for that device, and old-session or out-of-order packets are rejected. MQTT telemetry is non-retained and browser/API histories are bounded.
-- ADC defaults: 12 bits, nominal 5 V, A0. RF dBm is always unavailable in this version because no valid setup calibration exists. Module supply/pinout remains unresolved pending hardware identification.
-- One SQLite writer process; run **one Uvicorn worker**. No cloud deployment, application authentication, OTA changes, calibration editor, trained anomaly detection, or behavioral prediction is included. Physical control is limited to declared LED capabilities.
+- The R4 firmware samples A5 at 10-bit resolution using a 3.3 V conversion assumption to preserve its supplied MLP features. Verify the actual ADC reference, AD8313 breakout wiring, and model calibration before interpreting voltage or classification as RF evidence. No calibrated dBm or frequency spectrum is provided.
+- One SQLite writer process; run **one Uvicorn worker**. No cloud deployment, application authentication, OTA changes, or calibration editor is included. Physical control is limited to declared LED capabilities.
 - Each project has configurable reading retention; cleanup deletes at most 200 expired readings per evaluation. Events and actions are preserved. Back up `data/agentwin.db` while stopped or use SQLite backup tooling.
 - English-first interface with Arabic-capable fallback and direction-aware project titles. Core labels are centralized; complete localization extraction remains future work.
 

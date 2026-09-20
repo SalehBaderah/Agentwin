@@ -208,7 +208,7 @@ These are two separate platform projects and two separate firmware projects. Cre
 9. Close Serial Monitor and start its gateway:
 
    ```powershell
-   .\.venv\Scripts\python.exe -m gateway.serial_gateway --port COM4 --baud 115200 --project YOUR_UNO_PROJECT_ID --device uno-d13-01
+   .\.venv\Scripts\python.exe -m gateway.serial_gateway --port COM4 --baud 38400 --project YOUR_UNO_PROJECT_ID --device uno-d13-01
    ```
 
 ### Project 2: UNO R4 WiFi RF detector and MLP over MQTT

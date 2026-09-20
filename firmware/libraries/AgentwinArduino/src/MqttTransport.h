@@ -18,18 +18,22 @@ class MqttTransport : public AgentwinTransport {
     clientId_[sizeof(clientId_) - 1] = '\0';
   }
   void begin() override { active() = this; mqtt_.onMessage(onMessage); }
-  void setNetworkAvailable(bool available) { networkAvailable_ = available; }
+  void setNetworkAvailable(bool available) {
+    if (networkAvailable_ && !available) mqtt_.stop();
+    if (!networkAvailable_ && available)
+      lastReconnectMs_ = millis() - reconnectIntervalMs_;  // Retry immediately after Wi-Fi returns.
+    networkAvailable_ = available;
+  }
   void loop() override {
     if (!networkAvailable_) return;
-    if (!mqtt_.connected()) {
-      const unsigned long now = millis();
-      if (now - lastReconnectMs_ < reconnectIntervalMs_) return;
-      lastReconnectMs_ = now;
-      connect();
-      return;
-    }
-    mqtt_.poll();
+    if (mqtt_.connected()) mqtt_.poll();
+    if (mqtt_.connected()) return;
+    const unsigned long now = millis();
+    if (now - lastReconnectMs_ < reconnectIntervalMs_) return;
+    lastReconnectMs_ = now;
+    connect();
   }
+  bool connected() { return networkAvailable_ && mqtt_.connected(); }
   bool readCommand(String &command) override {
     if (!hasPending_) return false;
     command = pending_;
@@ -39,9 +43,15 @@ class MqttTransport : public AgentwinTransport {
   }
   bool publishTelemetry(JsonDocument &packet) override {
     if (!mqtt_.connected()) return false;
-    mqtt_.beginMessage(telemetryTopic_);
-    serializeJson(packet, mqtt_);
-    return mqtt_.endMessage() == 1;
+    // ArduinoMqttClient buffers unsized messages in a 256-byte TX buffer.
+    // Supplying the exact length streams the JSON instead of truncating it.
+    const size_t payloadSize = measureJson(packet);
+    if (mqtt_.beginMessage(telemetryTopic_, static_cast<unsigned long>(payloadSize)) != 1)
+      return false;
+    const size_t written = serializeJson(packet, mqtt_);
+    const bool published = mqtt_.endMessage() == 1;
+    if (written != payloadSize || !published) mqtt_.stop();
+    return written == payloadSize && published;
   }
 
  private:

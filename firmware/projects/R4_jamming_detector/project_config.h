@@ -2,7 +2,7 @@
 #include <Arduino.h>
 
 namespace ProjectConfig {
-constexpr char PROJECT_ID[] = "replace-with-project-id";
+constexpr char PROJECT_ID[] = "project-6309ff857a";
 constexpr char DEVICE_ID[] = "r4-rf-01";
 constexpr char BOOT_PREFIX[] = "uno-r4-rf";
 // This project is read-only, so it does not emit a command acknowledgement field.

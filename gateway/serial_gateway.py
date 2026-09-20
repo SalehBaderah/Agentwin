@@ -99,14 +99,14 @@ def main():
                         if not frame:
                             continue
                         if len(frame) > 8192 or not frame.endswith(b'\n'):
-                            log.warning('Incomplete or oversized serial frame rejected')
+                            log.warning('Incomplete or oversized serial frame rejected: bytes=%d newline=%s', len(frame), frame.endswith(b'\n'))
                             continue
                         try:
                             payload = validate_line(frame.rstrip(b'\r\n'), args.project, args.device)
                             if client.is_connected():
                                 client.publish(topic+'/telemetry', payload, qos=0, retain=False)
                         except ValueError as error:
-                            log.warning('Invalid serial frame rejected: %s; frame=%r', error, frame[:240])
+                            log.warning('Invalid serial frame rejected: %s; bytes=%d frame_prefix=%r frame_suffix=%r', error, len(frame), frame[:120], frame[-80:])
             except (serial.SerialException, OSError):
                 client.publish(topic+'/status', json.dumps({'online': False}), qos=0, retain=False)
                 log.warning('Serial unavailable; retrying in 3 seconds')

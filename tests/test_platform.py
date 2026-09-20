@@ -68,6 +68,20 @@ def test_commands_and_telemetry_are_scoped(store):
     with pytest.raises(ValueError): validate_command(json.dumps(scoped), 'another-project', project['device_id'])
     with pytest.raises(ValueError): validate_command(json.dumps({**command, 'value': 1}))
 
+def test_corrupted_serial_telemetry_is_rejected_without_guessing_fields(store):
+    project = store.project('smart-connectivity')
+    valid = packet(project, readings={'led_on': True, 'last_command_id': 'action-1'})
+    for damaged in (
+        {**valid, 'boo_id': valid['boot_id']},
+        {**valid, 'readings': None, 'redings': valid['readings']},
+    ):
+        damaged.pop('boot_id' if 'boo_id' in damaged else 'readings')
+        with pytest.raises(ValueError):
+            validate_line(json.dumps(damaged), project['id'], project['device_id'])
+    with pytest.raises(ValueError):
+        validate_line(json.dumps(valid)[:-1], project['id'], project['device_id'])
+    assert json.loads(validate_line(json.dumps(valid), project['id'], project['device_id']))['readings']['led_on'] is True
+
 def test_schema_rejections_and_session_isolation(store):
     project = store.project('smart-connectivity'); live = store.session(project['id'], mode='live')['id']; simulated = store.session(project['id'], mode='simulated')['id']
     assert store.ingest(packet(project, readings={'led_on':False,'last_command_id':None}), live)['accepted']

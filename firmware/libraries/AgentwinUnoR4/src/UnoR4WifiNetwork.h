@@ -15,7 +15,11 @@ class UnoR4WifiNetwork {
   bool connected() const { return WiFi.status() == WL_CONNECTED; }
 
  private:
-  void attemptConnection() { lastAttemptMs_ = millis(); WiFi.begin(ssid_, password_); }
+  void attemptConnection() {
+    WiFi.disconnect();  // Clear a stale station association before a fresh attempt.
+    WiFi.begin(ssid_, password_);
+    lastAttemptMs_ = millis();  // WiFi.begin can block for ten seconds.
+  }
   const char *ssid_;
   const char *password_;
   unsigned long reconnectIntervalMs_;
