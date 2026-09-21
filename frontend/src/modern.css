@@ -1,8 +1,6 @@
 /* Product layout and component treatment; operational state stays in main.tsx. */
 body {
-  background:
-    radial-gradient(ellipse at 85% 0, var(--accent-subtle), transparent 38rem),
-    var(--background);
+  background: var(--background);
   color: var(--text-primary);
   line-height: 1.5;
 }
@@ -39,6 +37,7 @@ button:disabled {
   background: var(--accent) !important;
   color: var(--accent-foreground);
   border-color: var(--accent) !important;
+  box-shadow: var(--light-specular);
 }
 .primary:hover,
 .ask-component:hover {
@@ -134,7 +133,7 @@ option {
   border: 1px solid var(--border);
   border-radius: 18px;
   padding: 24px 14px 18px;
-  background: var(--surface);
+  background: var(--sidebar-background);
   z-index: var(--z-chrome);
   box-shadow: var(--shadow-panel);
   transition: width var(--duration-fast) var(--ease-smooth-out);
@@ -293,16 +292,18 @@ p,
 }
 .panel,
 .workspace-main,
-.setup-form {
+.setup-form,
+.agent-panel {
   border-radius: var(--radius-panel);
   background: var(--surface);
-  box-shadow: none;
+  box-shadow: var(--light-specular);
 }
 .overview-signal {
   min-height: 106px;
   border: 1px solid var(--border);
   border-radius: var(--radius-panel);
   background: var(--surface);
+  box-shadow: var(--light-specular);
   padding: 22px 24px;
 }
 .overview-signal p,
@@ -357,6 +358,7 @@ p,
   border: 1px solid var(--border);
   border-radius: var(--radius-panel);
   background: var(--surface);
+  box-shadow: var(--light-specular);
   overflow: hidden;
   margin-top: 1.5px; /* Gives space for the -2px hover transform */
   transition:
@@ -491,8 +493,8 @@ p,
   padding: 0;
 }
 .workspace-grid {
-  grid-template-columns: minmax(0, 1fr) 300px;
-  gap: 20px;
+  grid-template-columns: minmax(0, 1fr) 10px minmax(320px, var(--agent-width, 380px));
+  gap: 10px;
   align-items: start;
 }
 .workspace-main {
@@ -502,6 +504,38 @@ p,
   position: sticky;
   top: 20px;
   min-width: 0;
+}
+.workspace-resizer {
+  position: sticky;
+  top: 20px;
+  align-self: stretch;
+  width: 10px;
+  min-width: 10px;
+  min-height: 520px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  cursor: col-resize;
+  touch-action: none;
+}
+.workspace-resizer::before {
+  content: "";
+  display: block;
+  width: 1px;
+  height: 100%;
+  margin: 0 auto;
+  background: var(--border);
+}
+.workspace-resizer:hover::before,
+.workspace-resizer:focus-visible::before {
+  width: 2px;
+  background: var(--accent-text);
+}
+.resizing-agent,
+.resizing-agent * {
+  cursor: col-resize !important;
+  user-select: none !important;
 }
 .workspace-agent .agent-mini {
   border: 1px solid var(--border);
@@ -534,15 +568,6 @@ p,
 .workspace-agent .agent-mini {
   min-height: 0;
 }
-.agent-capabilities {
-  gap: 6px;
-}
-.agent-capabilities span {
-  background: var(--surface-hover);
-  color: var(--text-secondary);
-  border: 0;
-  font-size: 12px;
-}
 .agent-prompts {
   display: grid;
   gap: 7px;
@@ -571,6 +596,8 @@ p,
 }
 .agent-answer {
   overflow-wrap: anywhere;
+  max-height: none;
+  overflow: visible;
 }
 .agent-answer strong {
   font-size: 14px;
@@ -885,7 +912,11 @@ p,
   color: var(--danger);
 }
 @supports (backdrop-filter: blur(16px)) {
-  .sidebar,
+  .sidebar {
+    background: var(--sidebar-glass);
+    backdrop-filter: blur(var(--glass-blur)) saturate(130%);
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(130%);
+  }
   .dialog,
   .workspace-agent .agent-mini,
   .overview-signal {
@@ -903,13 +934,13 @@ p,
   .project-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
-  .workspace-grid {
-    grid-template-columns: minmax(0, 1fr) 320px;
-  }
 }
-@media (max-width: 1450px) {
+@media (max-width: 1180px) {
   .workspace-grid {
     grid-template-columns: minmax(0, 1fr);
+  }
+  .workspace-resizer {
+    display: none;
   }
   .workspace-agent {
     position: static;

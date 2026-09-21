@@ -10,7 +10,7 @@ from .models import ComponentAction, DeviceCreate, ProjectCreate, Question, Scen
 from .store import Store
 from .runtime import Runtime
 from .templates import definition
-from .agent import answer
+from .agent import answer, provider_configured
 
 load_dotenv()
 def create_app(path=None, background=True):
@@ -30,7 +30,7 @@ def create_app(path=None, background=True):
     @app.exception_handler(ValueError)
     async def invalid(request, error): return JSONResponse({'detail': str(error)}, 400)
     @app.get('/api/health')
-    def health(): return {'status': 'ready', 'mqtt': runtime.mqtt_connected, 'mqtt_rejections': runtime.rejections, 'agent_configured': bool(os.getenv('OPENAI_API_KEY'))}
+    def health(): return {'status': 'ready', 'mqtt': runtime.mqtt_connected, 'mqtt_rejections': runtime.rejections, 'agent_configured': provider_configured(), 'agent_provider': os.getenv('LLM_PROVIDER', 'openai')}
     @app.get('/api/projects')
     def projects(): return [store.state(project['id']) for project in store.projects()]
     @app.post('/api/projects', status_code=201)

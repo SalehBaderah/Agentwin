@@ -5,7 +5,7 @@ import type { TwinComponentState, TwinState } from "../model/twin.types";
 const relationshipColor: Record<string, string> = {
   physical: "var(--relationship-physical)",
   control: "var(--relationship-control)",
-  data: "var(--accent)",
+  data: "var(--operational-cyan)",
   power: "var(--relationship-power)",
   context: "var(--success)",
 };
@@ -58,7 +58,7 @@ export function TopologyTwin({ twin, selectedId, onSelect }: { twin: TwinState; 
     <div className="topology-note">Configured architecture · layout changes affect this view only.</div>
     <div className="twin twin-canvas" aria-label="Configured system topology">
       <ReactFlow nodes={nodes} edges={edges} onNodesChange={onNodesChange} onNodeClick={(_, node) => onSelect(node.id)} nodesDraggable nodesConnectable={false} elementsSelectable fitView fitViewOptions={{ padding: .2 }} minZoom={.4} maxZoom={1.8} proOptions={{ hideAttribution: true }}>
-        <Background color="var(--border-strong)" gap={24} size={1}/><MiniMap pannable zoomable nodeColor="var(--accent)" maskColor="var(--minimap-mask)"/><Controls showInteractive={false}/>
+        <Background color="var(--border-strong)" gap={24} size={1}/><MiniMap pannable zoomable nodeColor="var(--operational-cyan)" maskColor="var(--minimap-mask)"/><Controls showInteractive={false}/>
       </ReactFlow>
     </div>
   </div>;

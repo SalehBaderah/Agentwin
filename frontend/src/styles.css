@@ -122,7 +122,7 @@ nav a {
   border-radius: 7px;
 }
 nav a.active {
-  background: var(--gradient);
+  background: var(--accent-subtle);
   color: var(--text-primary);
   box-shadow: inset 2px 0 var(--accent);
 }
@@ -200,7 +200,7 @@ nav a.active {
   border-radius: 9px;
   width: 32px;
   height: 32px;
-  background: var(--gradient);
+  background: var(--accent-subtle);
   font-size: 13px;
 }
 .main {
@@ -306,9 +306,7 @@ small {
 }
 .overview-banner {
   border: 1px solid var(--border-strong);
-  background:
-    radial-gradient(ellipse at 80% 50%, var(--accent-subtle), transparent 65%),
-    linear-gradient(110deg, var(--surface-elevated), var(--surface-elevated) 55%, var(--surface-elevated));
+  background: var(--surface-elevated);
   border-radius: 12px;
   padding: 28px 30px;
   display: flex;
@@ -356,10 +354,8 @@ small {
 .orb.center {
   width: 76px;
   height: 76px;
-  background: var(--gradient);
-  box-shadow:
-    0 0 0 14px var(--accent-subtle),
-    0 0 0 30px var(--accent-subtle);
+  background: var(--accent-subtle);
+  box-shadow: 0 0 0 14px var(--accent-subtle);
 }
 .orb.center svg {
   width: 43px;
@@ -368,7 +364,7 @@ small {
 .banner-diagram i {
   height: 1px;
   width: 54px;
-  background: linear-gradient(90deg, var(--accent), var(--accent));
+  background: var(--accent);
   position: relative;
 }
 .banner-diagram i:after {
@@ -473,7 +469,7 @@ small {
 }
 .project-card {
   position: relative;
-  background: linear-gradient(145deg, var(--surface-elevated), var(--surface) 65%);
+  background: var(--surface);
   border: 1px solid var(--border);
   padding: 21px 20px 0;
   border-radius: 10px;
@@ -870,7 +866,7 @@ select {
 .agent-panel {
   border: 1px solid var(--border-strong);
   border-radius: 10px;
-  background: linear-gradient(170deg, var(--surface-elevated), var(--surface) 60%);
+  background: var(--surface);
   overflow: hidden;
 }
 .agent-heading {
@@ -883,7 +879,7 @@ select {
 .agent-icon {
   width: 34px;
   height: 34px;
-  background: var(--gradient);
+  background: var(--accent-subtle);
   border: 1px solid var(--accent-subtle);
   display: grid;
   place-items: center;
@@ -1201,7 +1197,7 @@ summary {
   color: var(--text-secondary);
 }
 .steps li.active > span {
-  background: var(--gradient);
+  background: var(--accent-subtle);
   border-color: var(--accent-text);
 }
 .setup-form {
@@ -1741,8 +1737,6 @@ label small {
 .agent-answer p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
 .workspace-agent { min-width: 0; }
 .workspace-agent .agent-mini { position: sticky; top: 18px; min-height: 520px; align-content: start; gap: 16px; }
-.agent-capabilities { display: flex; flex-wrap: wrap; gap: 6px; }
-.agent-capabilities span { padding: 5px 7px; color: var(--text-secondary); border: 1px solid var(--border); border-radius: 999px; background: var(--accent-subtle); font-size: 13px; }
 .agent-prompts { display: grid; gap: 6px; }
 .agent-prompts button { padding: 8px 9px; color: var(--secondary); border: 1px solid var(--border); border-radius: 7px; background: transparent; font-size: 13px; text-align: left; }
 .agent-prompts button:hover { color: var(--text-primary); border-color: var(--border-strong); background: var(--accent-subtle); }
@@ -1769,7 +1763,7 @@ button, .button, input, select { min-height: 40px; border-radius: 7px; }
 input, select { border: 1px solid var(--border-strong); background: var(--background); color: var(--text-primary); padding: 9px 11px; }
 input:hover, select:hover { border-color: var(--accent-border); }
 input:focus, select:focus { border-color: var(--accent-text); }
-.primary { background: var(--gradient) !important; color: var(--text-primary); border-color: var(--accent-border) !important; }
+.primary { background: var(--accent-subtle) !important; color: var(--text-primary); border-color: var(--accent-border) !important; }
 .secondary-button { background: var(--elevated); border-color: var(--border-strong); }
 .tertiary { background: transparent; color: var(--secondary); }
 .danger { color: var(--danger); border-color: var(--danger-border); }
@@ -1789,7 +1783,7 @@ nav a.active { background: var(--accent-subtle); box-shadow: inset 2px 0 var(--a
 .badge { min-height: 24px; padding: 3px 8px; border-radius: 5px; }
 
 .overview-signal { min-height: 104px; padding: 20px 22px; border-left-width: 1px; border-color: var(--border-strong); background: var(--surface); border-radius: 9px; }
-.overview-signal .signal-mark { border-radius: 8px; background: var(--gradient); color: var(--text-primary); }
+.overview-signal .signal-mark { border-radius: 8px; background: var(--accent-subtle); color: var(--text-primary); }
 .overview-stats, .stats:not(.overview-stats) { border-radius: 9px; overflow: hidden; }
 .stat { min-height: 124px; padding: 20px; }
 .stat strong { font-size: 29px; line-height: 1.25; margin: 14px 0 8px; }
@@ -1815,7 +1809,7 @@ nav a.active { background: var(--accent-subtle); box-shadow: inset 2px 0 var(--a
 .state-track i { flex: 1 1 3px; min-width: 2px; border-radius: 2px; background: var(--text-muted); }
 .state-track i.on { background: var(--success); }
 .state-track i.off { background: var(--text-muted); }
-.state-track i.categorical { background: var(--accent); }
+.state-track i.categorical { background: var(--operational-cyan); }
 .state-track-labels { display: flex; justify-content: space-between; margin-top: -10px; }
 .discrete-changes h3 { margin: 0 0 6px; color: var(--secondary); font-size: 13px; }
 .discrete-changes > div { display: flex; justify-content: space-between; padding: 6px 0; color: var(--muted); border-top: 1px solid var(--border); font-size: 13px; }
@@ -1829,7 +1823,7 @@ nav a.active { background: var(--accent-subtle); box-shadow: inset 2px 0 var(--a
 .evidence-facts strong { color: var(--text-primary); font-size: 13px; font-weight: 600; }
 .overview-chart .recharts-cartesian-axis-tick text, .metric-chart .recharts-cartesian-axis-tick text { fill: var(--muted); font-size: 13px; }
 .chart-empty { height: 290px; display: grid; place-content: center; justify-items: center; gap: 8px; text-align: center; color: var(--muted); }
-.chart-empty svg { color: var(--accent-text); }
+.chart-empty svg { color: var(--operational-cyan); }
 .chart-empty strong { color: var(--secondary); font-size: 14px; }
 .chart-empty p { max-width: 40ch; }
 .operation-count { display: grid; padding: 18px 0 20px; border-bottom: 1px solid var(--border); }
@@ -1872,7 +1866,7 @@ nav a.active { background: var(--accent-subtle); box-shadow: inset 2px 0 var(--a
 .stepper li span { width: 24px; height: 24px; display: grid; place-items: center; border: 1px solid var(--border-strong); border-radius: 50%; font-variant-numeric: tabular-nums; }
 .stepper li.active { color: var(--text-primary); background: var(--accent-subtle); }
 .stepper li.active span { border-color: var(--accent-text); color: var(--accent-text); }
-.stepper li.complete span { background: var(--gradient); color: var(--text-primary); border-color: transparent; }
+.stepper li.complete span { background: var(--accent-subtle); color: var(--text-primary); border-color: transparent; }
 .onboarding { display: block; max-width: none; min-height: 410px; padding: 26px; }
 .form-step { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; align-content: start; }
 .form-step-heading { grid-column: 1 / -1; padding-bottom: 18px; margin-bottom: 2px; border-bottom: 1px solid var(--border); }
@@ -1984,9 +1978,7 @@ nav a.active { background: var(--accent-subtle); box-shadow: inset 2px 0 var(--a
 .twin-stage > .twin {
   height: 520px;
   border-right: 1px solid var(--border);
-  background:
-    radial-gradient(circle at 25% 20%, var(--accent-subtle), transparent 35%),
-    var(--background);
+  background: var(--background);
 }
 
 .twin-node {
@@ -2194,7 +2186,7 @@ nav a.active { background: var(--accent-subtle); box-shadow: inset 2px 0 var(--a
   min-height: 360px;
   padding: 0;
   overflow: hidden;
-  background: radial-gradient(circle at 20% 20%, var(--accent-subtle), transparent 42%), var(--background);
+  background: var(--background);
 }
 .twin-canvas .react-flow { width: 100%; height: 100%; }
 .twin-canvas .react-flow__node { cursor: grab; }
@@ -2421,11 +2413,7 @@ h1 {
   margin-bottom: 16px;
   border: 1px solid var(--accent-border);
   border-left: 3px solid var(--accent);
-  background: linear-gradient(
-    105deg,
-    var(--accent-subtle),
-    var(--accent-subtle)
-  );
+  background: var(--accent-subtle);
 }
 
 .signal-mark {

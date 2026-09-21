@@ -10,7 +10,7 @@ function usePalette(): TwinPalette {
     const style = getComputedStyle(document.documentElement);
     const value = (name: string, fallback: string) => style.getPropertyValue(name).trim() || fallback;
     return {
-      canvas: value("--background", "#0B0B10"), grid: value("--border", "#282834"), surface: value("--surface", "#181820"), elevated: value("--surface-elevated", "#2A253D"), border: value("--border-strong", "#3A3945"), text: value("--text-primary", "#FFFFFF"), muted: value("--text-muted", "#9DA3AF"), accent: value("--accent", "#2CA5E0"), success: value("--success", "#4EBB8A"), warning: value("--warning", "#D6A34A"), danger: value("--danger", "#DB4B63"), physical: value("--relationship-physical", "#C8B58B"), control: value("--relationship-control", "#CE9DAA"), power: value("--relationship-power", "#CAB979"),
+      canvas: value("--background", "#000000"), grid: value("--border", "rgba(255,255,255,.08)"), surface: value("--surface", "#0D0D10"), elevated: value("--surface-elevated", "#16161A"), border: value("--border-strong", "rgba(255,255,255,.16)"), text: value("--text-primary", "#F4F4F5"), muted: value("--text-muted", "#71717A"), accent: value("--operational-cyan", "#2CA5E0"), success: value("--success", "#10B981"), warning: value("--warning", "#F59E0B"), danger: value("--danger", "#EF4444"), physical: value("--relationship-physical", "#C8B58B"), control: value("--relationship-control", "#CE9DAA"), power: value("--relationship-power", "#CAB979"),
     };
   }, []);
   const [palette, setPalette] = useState(read);

@@ -472,6 +472,7 @@ function Stat({
 function Workspace({ connected }: { connected: boolean }) {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [agentWidth, setAgentWidth] = useState(() => Number(localStorage.getItem("agentwin-agent-width")) || 380);
   const { id } = useParams();
   const navigate = useNavigate();
   const [state, setState] = useState<State | null>(null),
@@ -533,6 +534,32 @@ function Workspace({ connected }: { connected: boolean }) {
     setDeleting(true);
     try { await api(`/projects/${p.id}`, {}, "DELETE"); navigate("/projects"); }
     catch (failure) { setError((failure as Error).message); setDeleteOpen(false); } finally { setDeleting(false); }
+  };
+  const startAgentResize = (event: React.PointerEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    const startX = event.clientX;
+    const startWidth = agentWidth;
+    let currentWidth = agentWidth;
+    document.body.classList.add("resizing-agent");
+    const move = (moveEvent: PointerEvent) => {
+      currentWidth = Math.max(320, Math.min(640, startWidth + startX - moveEvent.clientX));
+      setAgentWidth(currentWidth);
+    };
+    const stop = () => {
+      document.body.classList.remove("resizing-agent");
+      localStorage.setItem("agentwin-agent-width", String(currentWidth));
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", stop);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", stop);
+  };
+  const nudgeAgentWidth = (event: React.KeyboardEvent<HTMLButtonElement>) => {
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+    event.preventDefault();
+    const nextWidth = Math.max(320, Math.min(640, agentWidth + (event.key === "ArrowLeft" ? 20 : -20)));
+    setAgentWidth(nextWidth);
+    localStorage.setItem("agentwin-agent-width", String(nextWidth));
   };
   return (
     <main className="page project-page"><Dialog open={deleteOpen} onClose={() => { if (!deleting) setDeleteOpen(false); }} title="Delete project?"><p>Delete {p.name} and all of its stored sessions, readings, events, and actions?</p><p className="danger-note">This cannot be undone.</p><div className="dialog-actions"><button autoFocus onClick={() => setDeleteOpen(false)} disabled={deleting}>Cancel</button><button className="danger" disabled={deleting} onClick={removeProject}>{deleting ? "Deleting?" : "Delete project"}</button></div></Dialog>
@@ -601,7 +628,7 @@ function Workspace({ connected }: { connected: boolean }) {
         />
       </div>
       <div className="source-note">{state.session.mode === "live" ? "Live data is scoped to this project and its registered devices." : "Test data is isolated from live device state and never routes physical commands."}</div>
-      <div className="workspace-grid">
+      <div className="workspace-grid" style={{ "--agent-width": `${agentWidth}px` } as React.CSSProperties}>
         <section className="workspace-main">
           <Tabs value={tab} onChange={setTab} items={[["overview", "Overview"], ["readings", "Live readings"], ["twin", "Digital twin"], ["events", "Events & history"], ["controls", "Controls"]]}/>
           <div className="tab-content" id="project-panel" role="tabpanel" aria-labelledby={`tab-${tab}`} tabIndex={0}>
@@ -614,6 +641,7 @@ function Workspace({ connected }: { connected: boolean }) {
             {tab === "controls" && <ControlsPanel state={state} refresh={refresh} />}
           </div>
         </section>
+        <button className="workspace-resizer" type="button" aria-label="Resize agent panel" title="Drag to resize; use arrow keys; double-click to reset" onPointerDown={startAgentResize} onKeyDown={nudgeAgentWidth} onDoubleClick={() => { setAgentWidth(380); localStorage.setItem("agentwin-agent-width", "380"); }} />
         <aside className="workspace-agent"><AgentPanel state={state}/></aside>
       </div>
     </main>
@@ -674,7 +702,7 @@ function AgentPanel({ state }: { state: State }) {
   const [question, setQuestion] = useState(""), [answer, setAnswer] = useState<Answer | null>(null), [busy, setBusy] = useState(false), [agentError, setAgentError] = useState("");
   const ask = async () => { if (!question.trim()) return; setBusy(true); setAgentError(""); try { setAnswer(await api<Answer>(`/projects/${state.project.id}/sessions/${state.session.id}/agent`, { question })); } catch (error) { setAgentError((error as Error).message); } finally { setBusy(false); } };
   const prompts = ["What is the current state?", "What changed recently?", "Explain active events", "Which actions are permitted?"];
-  return <section className="panel agent-mini"><div className="agent-mini-heading"><span><MessageSquare size={18}/></span><div><h3>Project agent</h3><p>Explains this system using stored evidence and permitted tools.</p></div></div><div className="agent-context"><span>Project scope</span><strong>{state.project.name}</strong><small>{state.session.mode} session · {state.status}</small></div><div className="agent-capabilities"><span>Current state</span><span>Recent readings</span><span>Events</span><span>Permitted actions</span></div><div className="agent-prompts">{prompts.map(prompt=><button type="button" key={prompt} onClick={()=>setQuestion(prompt)}>{prompt}</button>)}</div><div className="agent-question"><textarea aria-label="Question for project agent" rows={3} value={question} onChange={(event) => setQuestion(event.target.value)} placeholder="Ask about a reading, change, event, or allowed action"/><button onClick={ask} disabled={busy || !question.trim()} aria-label="Ask project agent"><Send size={16}/>{busy ? "Checking evidence…" : "Ask agent"}</button></div>{agentError && <p className="error" role="alert">{agentError}</p>}{answer && <div aria-live="polite" className={`agent-answer ${answer.available ? "" : "unavailable"}`}><div><span>Finding</span><strong>{answer.finding}</strong></div>{answer.evidence.length>0&&<div><span>Evidence</span>{answer.evidence.slice(0,3).map(item=><small key={item.id}>{item.id} · {time(item.timestamp)}</small>)}</div>}<div><span>Uncertainty</span><p>{answer.uncertainty}</p></div><div><span>Next step</span><p>{answer.next_step}</p></div></div>}<p className="agent-guardrail">Actions require backend permission and operator confirmation. Device telemetry verifies completion.</p></section>;
+  return <section className="panel agent-mini"><div className="agent-mini-heading"><span><MessageSquare size={18}/></span><div><h3>Project agent</h3><p>Explains this system using stored evidence.</p></div></div><div className="agent-context"><span>Project scope</span><strong>{state.project.name}</strong><small>{state.session.mode} session · {state.status}</small></div><div className="agent-prompts">{prompts.map(prompt=><button type="button" key={prompt} onClick={()=>setQuestion(prompt)}>{prompt}</button>)}</div><div className="agent-question"><textarea aria-label="Question for project agent" rows={3} value={question} onChange={(event) => setQuestion(event.target.value)} placeholder="Ask about a reading, change, event, or allowed action"/><button onClick={ask} disabled={busy || !question.trim()} aria-label="Ask project agent"><Send size={16}/>{busy ? "Checking evidence…" : "Ask agent"}</button></div>{agentError && <p className="error" role="alert">{agentError}</p>}{answer && <div aria-live="polite" className={`agent-answer ${answer.available ? "" : "unavailable"}`}><div><span>Finding</span><strong>{answer.finding}</strong></div>{answer.evidence.length>0&&<div><span>Evidence</span>{answer.evidence.slice(0,3).map(item=><small key={item.id}>{item.id} · {time(item.timestamp)}</small>)}</div>}<div><span>Uncertainty</span><p>{answer.uncertainty}</p></div><div><span>Next step</span><p>{answer.next_step}</p></div></div>}<p className="agent-guardrail">Actions require backend permission and operator confirmation. Device telemetry verifies completion.</p></section>;
 }
 
 export function LegacyAddProject() {

@@ -92,6 +92,13 @@ The classic UNO firmware and gateway must both use **38400 baud**. After uploadi
 - UNO gateway warnings: confirm its COM port, close Serial Monitor, and match the 38400-baud firmware. The battery-powered R4 does not use a COM port.
 - MQTT connected but UNO not reporting: check the `agentwin-backend` ACL's **write** permission for the UNO telemetry/status topics.
 
+If a server reports that port `8000` is already in use, find the listening process and terminate its PID before restarting Uvicorn:
+
+```powershell
+netstat -ano | findstr LISTENING | findstr :8000
+Stop-Process -Id <PID>
+```
+
 ## What works
 
 - Overview, project workspace, add-project flow, events and useful setup settings.
@@ -102,7 +109,7 @@ The classic UNO firmware and gateway must both use **38400 baud**. After uploadi
 - WebSocket snapshots update the overview and project workspace every second. Reconnect loads the current state via HTTP and resumes snapshots; charts/browser readings are bounded to 180 samples. Missing samples produce chart gaps.
 - Device/project/topic validation, strict versioned schema, finite/range/type checks, deduplication, retired-boot rejection, retained-message rejection, server receipt timestamps and connector-derived source metadata.
 - Deterministic missing-telemetry and high-limit rules with three-sample level debounce, a ten-second recurrence cooldown and explicit recovery. Acknowledgement is a separate operator action.
-- Server-side OpenAI Responses integration with six structured tools, project/session binding, bounded calls/timeout, structured findings and stored evidence references. Offline/missing-key failures explicitly display **AI agent unavailable**.
+- Local Qwen synthesis through LM Studio with deterministic server-side observation routing, free-text redaction, JSON-schema output and server-attached evidence. The existing OpenAI Responses tool loop remains an optional provider. Provider failures explicitly display **AI agent unavailable** while deterministic monitoring continues.
 - Arduino USB telemetry plus a reconnecting pySerial/Paho gateway with availability reporting and live-only LED command forwarding. Requested actions remain separate from telemetry-confirmed completion.
 
 ## Architecture and contracts
@@ -119,9 +126,9 @@ flowchart LR
   DB --> WS[WebSocket snapshots]
   WS --> UI[React / Recharts / React Flow]
   UI --> API[FastAPI]
-  API --> AG[Scoped agent tools]
+  API --> AG[Deterministic agent controller]
   AG --> DB
-  AG --> LLM[Optional hosted OpenAI provider]
+  AG --> LLM[Local LM Studio / optional OpenAI]
 ```
 
 `backend/models.py` owns request/message validation; generated telemetry schema is in `schemas/telemetry-v1.json`. `backend/templates.py` owns reusable fields/components/relationships. `backend/store.py` owns persistence and deterministic event rules. `backend/runtime.py` handles MQTT, simulation and replay. `backend/agent.py` owns tools and provider integration. `gateway/`, `firmware/`, `simulator/`, `frontend/`, `tests/`, and `docs/` contain their corresponding layers.
@@ -130,11 +137,17 @@ API explorer: http://127.0.0.1:8000/docs. Project/session IDs in routes select t
 
 ### AI security and evidence
 
-Device labels, descriptions and stored conversation content are data, not trusted instructions. Tool arguments use strict schemas with no arbitrary URLs, code, SQL, or project override. Event references are checked within project/session before proposing actions. Credentials stay in server environment variables. Calls have a 45-second overall timeout, 15-second request timeout, four turns and eight tool calls maximum. No calls occur per sensor sample; user questions invoke the provider.
+Device labels, descriptions, notes and stored conversation content are data, not trusted instructions. The local controller chooses and executes bounded operations before inference, removes arbitrary prose fields, exposes no tools to Qwen, and attaches reading/event evidence from returned records rather than model text. Event references are checked within project/session before proposals. No calls occur per sensor sample; user questions invoke the provider. The optional OpenAI provider retains its bounded four-turn/eight-tool-call loop.
 
-Set `OPENAI_API_KEY`, `LLM_PROVIDER=openai` and `LLM_MODEL` in `.env`, then restart. The starting model `gpt-5.6-luna` is documented in the [official model page](https://developers.openai.com/api/docs/models/gpt-5.6-luna); [Responses function calling](https://developers.openai.com/api/docs/guides/function-calling) is implemented using the installed SDK. Account access, credentials and live response quality have not been verified. Tests use a fake provider to verify the real tool loop without fabricating a live conversation in the product.
+For local Qwen, start LM Studio's localhost server, load the model and copy its identifier from `lms ps` or `GET /v1/models`. With the current model, set `LLM_PROVIDER=lmstudio`, `LLM_MODEL=qwen/qwen3-4b-2507`, and `LLM_BASE_URL=http://127.0.0.1:1234/v1` in `.env`. The server must remain running while Agentwin answers questions. See `.env.example` for the complete local configuration.
+
+To use the optional hosted provider instead, set `OPENAI_API_KEY`, `LLM_PROVIDER=openai` and `LLM_MODEL`. The starting hosted model `gpt-5.6-luna` is documented in the [official model page](https://developers.openai.com/api/docs/models/gpt-5.6-luna); [Responses function calling](https://developers.openai.com/api/docs/guides/function-calling) remains implemented using the installed SDK.
 
 Only server-generated references to stored readings/events render as evidence. They do not guarantee that every model statement is correct; unsupported/invalid references are removed. Missing evidence is disclosed. Monitoring/rules work without any API key or internet. Provider-configured status means configuration exists, not that a request succeeded.
+
+### Operational-agent evaluation
+
+`evals/granite` contains the original fixed 30-case suite, now named `agentwin-operational-agent-v1`. Qwen's deterministic-context controller passed all 30 frozen cases; the result is documented in `evals/granite/QWEN3_DETERMINISTIC_RESULT.md`. This synthetic result validates the included boundaries, not production reliability or live hardware. Validate the harness using `.\.venv\Scripts\python.exe -m evals.granite.run --validate-only`, or follow `evals/granite/README.md` to repeat model inference.
 
 ## Configuration and assumptions
 
