@@ -49,6 +49,24 @@ def provider_configured():
     return provider == 'openai' and bool(os.getenv('OPENAI_API_KEY'))
 
 
+async def provider_available(client=None):
+    """Verify the configured provider without sending project data or prompts."""
+    if not provider_configured():
+        return False
+    provider = os.getenv('LLM_PROVIDER', 'openai').lower()
+    client = client or AsyncOpenAI(
+        base_url=os.getenv('LLM_BASE_URL', 'http://127.0.0.1:1234/v1') if provider == 'lmstudio' else None,
+        api_key=os.getenv('LLM_API_KEY', 'lm-studio') if provider == 'lmstudio' else os.getenv('OPENAI_API_KEY'),
+        timeout=2,
+        max_retries=0,
+    )
+    try:
+        await client.models.list()
+        return True
+    except Exception:
+        return False
+
+
 def sanitize_for_model(value: Any):
     if isinstance(value, list):
         return [sanitize_for_model(item) for item in value]

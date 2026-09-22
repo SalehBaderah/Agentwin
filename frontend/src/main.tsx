@@ -101,6 +101,7 @@ function Badge({
 type ServiceHealth = {
   mqtt: boolean;
   agent_configured: boolean;
+  agent_available: boolean;
   mqtt_rejections: number;
 };
 
@@ -322,13 +323,13 @@ function HealthRows({ connected, health, reporting, devices }: { connected: bool
     <div><span><i className={connected ? "healthy" : "down"}/>Backend</span><strong>{connected ? "Connected" : "Reconnecting"}</strong></div>
     <div><span><i className={health?.mqtt ? "healthy" : "warning"}/>MQTT broker</span><strong>{health === null ? "Checking" : health.mqtt ? "Connected" : "Disconnected"}</strong></div>
     <div><span><i className={devices > 0 && reporting < devices ? "warning" : "healthy"}/>Devices</span><strong>{devices ? `${reporting}/${devices} reporting` : "None configured"}</strong></div>
-    <div><span><i className={health?.agent_configured ? "healthy" : "warning"}/>Agent</span><strong>{health === null ? "Checking" : health.agent_configured ? "Configured" : "Not configured"}</strong></div>
+    <div><span><i className={health?.agent_available ? "healthy" : health?.agent_configured ? "down" : "warning"}/>Agent</span><strong>{health === null ? "Checking" : health.agent_available ? "Available" : health.agent_configured ? "Unreachable" : "Not configured"}</strong></div>
   </div>;
 }
 
 function SystemStatus({ open, onToggle, onClose, connected, health, reporting, devices }: { open: boolean; onToggle: () => void; onClose: () => void; connected: boolean; health: ServiceHealth | null; reporting: number; devices: number }) {
   const dropdownClass = useDropdownClass(open);
-  const healthy = connected && health?.mqtt === true && health.agent_configured && (devices === 0 || reporting === devices);
+  const healthy = connected && health?.mqtt === true && health.agent_available && (devices === 0 || reporting === devices);
   return <div className="topbar-control-wrap system-status-control">
     <button className={`topbar-system-trigger ${connected ? healthy ? "healthy" : "warning" : "down"}`} type="button" onClick={onToggle} aria-haspopup="dialog" aria-expanded={open}>
       <span className="system-status-dot"/><span>System status</span><ChevronRight size={14}/>
