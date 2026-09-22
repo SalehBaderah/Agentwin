@@ -31,7 +31,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       document.documentElement.style.colorScheme = theme;
       document
         .querySelector('meta[name="theme-color"]')
-        ?.setAttribute("content", theme === "dark" ? "#000000" : "#F4F5F7");
+        ?.setAttribute("content", theme === "dark" ? "#0B0B0C" : "#F4F5F7");
     };
     apply();
     media.addEventListener("change", apply);

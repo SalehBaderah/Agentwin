@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   BrowserRouter,
@@ -23,6 +23,7 @@ import {
   ChevronRight,
   Database,
   FlaskConical,
+  Info,
   Layers,
   LayoutDashboard,
   Radio,
@@ -30,6 +31,8 @@ import {
   Power,
   MessageSquare,
   Menu,
+  MoreHorizontal,
+  Search,
   Send,
   Settings as SettingsIcon,
   ShieldCheck,
@@ -94,14 +97,286 @@ function Badge({
     </span>
   );
 }
+
+type ServiceHealth = {
+  mqtt: boolean;
+  agent_configured: boolean;
+  mqtt_rejections: number;
+};
+
+type ProjectContext = { projectId: string; mode: string };
+
+type CommandItem = {
+  id: string;
+  label: string;
+  meta: string;
+  path: string;
+  kind: "project" | "device" | "event" | "settings";
+};
+
+const sessionLabel = (mode: string) =>
+  mode === "live" ? "Live" : mode === "simulated" ? "Simulation" : mode === "replay" ? "Replay" : mode;
+
+function useDropdownClass(open: boolean) {
+  const [closing, setClosing] = useState(false);
+  const wasOpen = useRef(open);
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    if (open) {
+      setClosing(false);
+    } else if (wasOpen.current) {
+      setClosing(true);
+      const closeMs = parseFloat(
+        getComputedStyle(document.documentElement).getPropertyValue("--dropdown-close-dur"),
+      ) || 150;
+      timer = setTimeout(() => setClosing(false), closeMs);
+    }
+    wasOpen.current = open;
+    return () => clearTimeout(timer);
+  }, [open]);
+  return open ? "is-open" : closing ? "is-closing" : "";
+}
+
+function SystemSwitcher({
+  open,
+  onToggle,
+  onClose,
+  states,
+  selectedProjectId,
+}: {
+  open: boolean;
+  onToggle: () => void;
+  onClose: () => void;
+  states: State[];
+  selectedProjectId: string | null;
+}) {
+  const [query, setQuery] = useState("");
+  const trigger = useRef<HTMLButtonElement>(null);
+  const search = useRef<HTMLInputElement>(null);
+  const options = useRef<(HTMLButtonElement | null)[]>([]);
+  const navigate = useNavigate();
+  const dropdownClass = useDropdownClass(open);
+  const selected = states.find((state) => state.project.id === selectedProjectId);
+  const searchable = states.length > 7;
+  const projects = useMemo(() => {
+    const value = query.trim().toLowerCase();
+    return value ? states.filter((state) => `${state.project.name} ${state.project.id} ${state.devices.map((device) => device.id).join(" ")}`.toLowerCase().includes(value)) : states;
+  }, [query, states]);
+  const selectedOptionIndex = selectedProjectId ? Math.max(1, states.findIndex((state) => state.project.id === selectedProjectId) + 1) : 0;
+  useEffect(() => {
+    if (!open) return;
+    setQuery("");
+    requestAnimationFrame(() => {
+      if (searchable) search.current?.focus();
+      else options.current[selectedOptionIndex]?.focus();
+    });
+  }, [open, searchable, selectedOptionIndex]);
+  const choose = (path: string) => {
+    navigate(path);
+    onClose();
+    requestAnimationFrame(() => trigger.current?.focus());
+  };
+  const moveFocus = (event: React.KeyboardEvent, direction: 1 | -1) => {
+    event.preventDefault();
+    const available = options.current.filter((option): option is HTMLButtonElement => Boolean(option));
+    if (!available.length) return;
+    const current = available.indexOf(document.activeElement as HTMLButtonElement);
+    available[(current + direction + available.length) % available.length]?.focus();
+  };
+  const onMenuKeyDown = (event: React.KeyboardEvent) => {
+    if (event.key === "ArrowDown") moveFocus(event, 1);
+    if (event.key === "ArrowUp") moveFocus(event, -1);
+    if (event.key === "Escape") {
+      event.preventDefault();
+      onClose();
+      trigger.current?.focus();
+    }
+  };
+  const projectState = (state: State) => {
+    if (state.devices.some((device) => device.reporting)) return { label: "Live", tone: "live" };
+    if (state.latest) return { label: "Stale", tone: "stale" };
+    return { label: "Unavailable", tone: "unavailable" };
+  };
+  return <div className="system-switcher">
+    <button ref={trigger} className="system-switcher-trigger" type="button" onClick={onToggle} onKeyDown={(event) => { if (event.key === "ArrowDown") { event.preventDefault(); if (!open) onToggle(); } }} aria-haspopup="menu" aria-expanded={open}>
+      <span className="system-switcher-mark"><Mark/></span>
+      <span>{selected?.project.name || "All Systems"}</span>
+      <ChevronRight size={14}/>
+    </button>
+    {(open || dropdownClass === "is-closing") && (
+      <button className="topbar-popover-dismiss" type="button" aria-label="Close system switcher" onClick={onClose}/>
+    )}
+    <section className={`t-dropdown topbar-popover system-switcher-menu ${dropdownClass}`} data-origin="top-left" role="menu" aria-label="System and project navigation" aria-hidden={!open} inert={!open ? true : undefined} onKeyDown={onMenuKeyDown}>
+      {searchable && <label className="system-switcher-search"><Search size={15}/><input ref={search} value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "ArrowDown") moveFocus(event, 1); }} placeholder="Find a project" aria-label="Find a project"/></label>}
+      <span className="switcher-group-label">All systems</span>
+      <button ref={(element) => { options.current[0] = element; }} className={`system-switcher-option ${!selectedProjectId ? "selected" : ""}`} type="button" role="menuitemradio" aria-checked={!selectedProjectId} onClick={() => choose("/")}>
+        <span className="switcher-option-icon"><LayoutDashboard size={15}/></span>
+        <span><strong>All Systems</strong><small>{states.length} configured {states.length === 1 ? "project" : "projects"}</small></span>
+        {!selectedProjectId && <Check size={15}/>}
+      </button>
+      <span className="switcher-group-label">Projects</span>
+      <div className="system-switcher-projects">
+        {projects.length ? projects.map((state, index) => {
+          const status = projectState(state);
+          const isSelected = state.project.id === selectedProjectId;
+          return <button key={state.project.id} ref={(element) => { options.current[index + 1] = element; }} className={`system-switcher-option ${isSelected ? "selected" : ""}`} type="button" role="menuitemradio" aria-checked={isSelected} onClick={() => choose(`/projects/${state.project.id}`)}>
+            <span className={`switcher-status ${status.tone}`}/>
+            <span><strong>{state.project.name}</strong><small>{status.label} · {state.devices.length} {state.devices.length === 1 ? "device" : "devices"}</small></span>
+            {isSelected && <Check size={15}/>}
+          </button>;
+        }) : <p className="switcher-empty">No projects match “{query}”.</p>}
+      </div>
+      <Link className="system-switcher-add" to="/projects/new" onClick={onClose}><Plus size={15}/>Add project</Link>
+    </section>
+  </div>;
+}
+
+function CommandLauncher({
+  open,
+  onOpen,
+  onClose,
+  states,
+}: {
+  open: boolean;
+  onOpen: () => void;
+  onClose: () => void;
+  states: State[];
+}) {
+  const [query, setQuery] = useState("");
+  const input = useRef<HTMLInputElement>(null);
+  const navigate = useNavigate();
+  const dropdownClass = useDropdownClass(open);
+  const items = useMemo<CommandItem[]>(() => {
+    const projects = states.map((state) => ({
+      id: `project-${state.project.id}`,
+      label: state.project.name,
+      meta: "Project",
+      path: `/projects/${state.project.id}`,
+      kind: "project" as const,
+    }));
+    const devices = states.flatMap((state) =>
+      state.devices.map((device) => ({
+        id: `device-${state.project.id}-${device.id}`,
+        label: device.id,
+        meta: `Device in ${state.project.name}`,
+        path: `/projects/${state.project.id}`,
+        kind: "device" as const,
+      })),
+    );
+    const events = states.flatMap((state) =>
+      state.events.map((event) => ({
+        id: `event-${state.project.id}-${event.id}`,
+        label: event.kind.replaceAll("_", " ").replace(/^./, (letter) => letter.toUpperCase()),
+        meta: `${event.recovered ? "Recovered" : "Open"} event in ${state.project.name}`,
+        path: "/events",
+        kind: "event" as const,
+      })),
+    );
+    return [
+      ...projects,
+      ...devices,
+      ...events,
+      { id: "settings", label: "Settings", meta: "Appearance and service availability", path: "/settings", kind: "settings" },
+    ];
+  }, [states]);
+  const results = useMemo(() => {
+    const value = query.trim().toLowerCase();
+    if (!value) return items.filter((item) => item.kind === "project" || item.kind === "settings").slice(0, 7);
+    return items.filter((item) => `${item.label} ${item.meta} ${item.kind}`.toLowerCase().includes(value)).slice(0, 10);
+  }, [items, query]);
+  useEffect(() => {
+    if (!open) return;
+    setQuery("");
+    requestAnimationFrame(() => input.current?.focus());
+  }, [open]);
+  const choose = (path: string) => {
+    navigate(path);
+    onClose();
+  };
+  return (
+    <div className="topbar-search-wrap">
+      <button className="topbar-search-trigger" type="button" onClick={onOpen} aria-haspopup="dialog" aria-expanded={open}>
+        <Search size={16} /><span>Search</span><kbd>Ctrl K</kbd>
+      </button>
+      {(open || dropdownClass === "is-closing") && <button className="topbar-popover-dismiss" type="button" aria-label="Close command launcher" onClick={onClose} />}
+      <div className="command-launcher-shell">
+        <section className={`t-dropdown command-launcher ${dropdownClass}`} data-origin="top-right" role="dialog" aria-label="Search Agentwin" aria-hidden={!open} inert={!open ? true : undefined}>
+          <label className="command-search"><Search size={18}/><input ref={input} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search projects, devices, events, settings" aria-label="Search projects, devices, events, and settings"/><kbd>Esc</kbd></label>
+          <div className="command-results" role="listbox" aria-label="Search results">
+            {results.length ? results.map((item) => (
+              <button key={item.id} type="button" role="option" aria-selected="false" onClick={() => choose(item.path)}>
+                <span className={`command-kind ${item.kind}`}>{item.kind === "project" ? <Layers size={15}/> : item.kind === "device" ? <Radio size={15}/> : item.kind === "event" ? <Bell size={15}/> : <SettingsIcon size={15}/>}</span>
+                <span><strong>{item.label}</strong><small>{item.meta}</small></span>
+                <ChevronRight size={15}/>
+              </button>
+            )) : <p className="command-empty">No matching projects, devices, events, or settings.</p>}
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+
+function HealthRows({ connected, health, reporting, devices }: { connected: boolean; health: ServiceHealth | null; reporting: number; devices: number }) {
+  return <div className="system-status-rows">
+    <div><span><i className={connected ? "healthy" : "down"}/>Backend</span><strong>{connected ? "Connected" : "Reconnecting"}</strong></div>
+    <div><span><i className={health?.mqtt ? "healthy" : "warning"}/>MQTT broker</span><strong>{health === null ? "Checking" : health.mqtt ? "Connected" : "Disconnected"}</strong></div>
+    <div><span><i className={devices > 0 && reporting < devices ? "warning" : "healthy"}/>Devices</span><strong>{devices ? `${reporting}/${devices} reporting` : "None configured"}</strong></div>
+    <div><span><i className={health?.agent_configured ? "healthy" : "warning"}/>Agent</span><strong>{health === null ? "Checking" : health.agent_configured ? "Configured" : "Not configured"}</strong></div>
+  </div>;
+}
+
+function SystemStatus({ open, onToggle, onClose, connected, health, reporting, devices }: { open: boolean; onToggle: () => void; onClose: () => void; connected: boolean; health: ServiceHealth | null; reporting: number; devices: number }) {
+  const dropdownClass = useDropdownClass(open);
+  const healthy = connected && health?.mqtt === true && health.agent_configured && (devices === 0 || reporting === devices);
+  return <div className="topbar-control-wrap system-status-control">
+    <button className={`topbar-system-trigger ${connected ? healthy ? "healthy" : "warning" : "down"}`} type="button" onClick={onToggle} aria-haspopup="dialog" aria-expanded={open}>
+      <span className="system-status-dot"/><span>System status</span><ChevronRight size={14}/>
+    </button>
+    {(open || dropdownClass === "is-closing") && (
+      <button className="topbar-popover-dismiss" type="button" aria-label="Close system status" onClick={onClose}/>
+    )}
+    <section className={`t-dropdown topbar-popover system-status-popover ${dropdownClass}`} data-origin="top-right" role="dialog" aria-label="System status details" aria-hidden={!open} inert={!open ? true : undefined}>
+      <div className="popover-heading"><strong>System status</strong><span>{healthy ? "Operational" : "Attention needed"}</span></div>
+      <HealthRows connected={connected} health={health} reporting={reporting} devices={devices}/>
+    </section>
+  </div>;
+}
 function App() {
   const [states, setStates] = useState<State[]>([]),
     [connected, setConnected] = useState(false),
     [loaded, setLoaded] = useState(false),
     [error, setError] = useState("");
+  const [health, setHealth] = useState<ServiceHealth | null>(null);
+  const [projectContext, setProjectContext] = useState<ProjectContext | null>(null);
+  const [topbarPanel, setTopbarPanel] = useState<"context" | "search" | "status" | "overflow" | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const route = useLocation();
+  const updateProjectContext = useCallback((context: ProjectContext) => setProjectContext(context), []);
+  useEffect(() => {
+    if (!/^\/projects\/[^/]+$/.test(route.pathname)) setProjectContext(null);
+    setTopbarPanel(null);
+  }, [route.pathname]);
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setTopbarPanel("search");
+      } else if (event.key === "Escape") {
+        setTopbarPanel(null);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+  useEffect(() => {
+    let stopped = false;
+    const check = () => api<ServiceHealth>("/health").then((value) => { if (!stopped) setHealth(value); }).catch(() => { if (!stopped) setHealth(null); });
+    check();
+    const timer = window.setInterval(check, 10000);
+    return () => { stopped = true; window.clearInterval(timer); };
+  }, []);
   useEffect(() => {
     if (matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     const page = document.querySelector("main.page");
@@ -158,13 +433,18 @@ function App() {
   const active = states
     .flatMap((s) => s.events)
     .filter((e) => !e.recovered).length;
+  const devices = states.reduce((total, state) => total + state.devices.length, 0);
+  const reporting = states.reduce((total, state) => total + state.devices.filter((device) => device.reporting).length, 0);
+  const contextMode = projectContext ? sessionLabel(projectContext.mode) : null;
+  const selectedProjectId = route.pathname.match(/^\/projects\/([^/]+)$/)?.[1] || null;
+  const overflowClass = useDropdownClass(topbarPanel === "overflow");
   return (
     <div className={`app ${collapsed ? "rail-collapsed" : ""}`}><a className="skip-link" href="#main-content">Skip to content</a>
       <aside className="sidebar">
         <Link to="/" className="brand">
           <Mark />
           {strings.brand}
-          <span className="version">MVP</span>
+          
         </Link>
         <button className="menu-toggle" aria-label="Toggle navigation" aria-expanded={menuOpen} onClick={() => setMenuOpen(!menuOpen)}>{menuOpen ? <X size={19}/> : <Menu size={19}/>}</button>
         <nav aria-label="Main navigation" className="desktop-navigation">
@@ -187,25 +467,43 @@ function App() {
             <span className="nav-label">{strings.settings}</span>
           </NavLink>
         </nav>
-        <button className="rail-toggle" onClick={() => setCollapsed(!collapsed)} aria-label={collapsed ? "Expand navigation" : "Collapse navigation"} aria-expanded={!collapsed}><Menu size={18}/><span className="nav-label">Collapse navigation</span></button><div className="sidebar-bottom">
-          <div className="local-card">
-            <ShieldCheck size={18} />
-            <div>
-              Local workspace<small>Monitoring runs on this device</small>
-            </div>
+        <div className="sidebar-bottom">
+          <div className="sidebar-about"><Info size={15}/><span>About Agentwin</span></div>
+          <div className="sidebar-identity">
+            <Mark/>
+            <div><strong>Agentwin MVP</strong><span>Every system.<br/>Its own agent.</span></div>
           </div>
-          <small>Agent questions use the configured provider.</small>
+          <button className="rail-toggle" onClick={() => setCollapsed(!collapsed)} aria-label={collapsed ? "Expand navigation" : "Collapse navigation"} aria-expanded={!collapsed}><Menu size={18}/><span className="nav-label">Collapse navigation</span></button>
         </div>
       </aside>
       <Dialog open={menuOpen} onClose={() => setMenuOpen(false)} title="Workspace navigation"><nav className="mobile-navigation" aria-label="Mobile navigation" onClick={() => setMenuOpen(false)}><NavLink to="/" end><LayoutDashboard size={20}/>Overview</NavLink><NavLink to="/projects"><Layers size={20}/>Projects</NavLink><NavLink to="/events"><Bell size={20}/>Events</NavLink><NavLink to="/settings"><SettingsIcon size={20}/>Settings</NavLink></nav><ThemeSwitcher/></Dialog>
       <div className="main" id="main-content" tabIndex={-1}>
         <header className="topbar">
-          <div className="breadcrumb">
-            Agentwin <ChevronRight size={14} /> <span>Operations</span>
+          <SystemSwitcher open={topbarPanel === "context"} onToggle={() => setTopbarPanel(topbarPanel === "context" ? null : "context")} onClose={() => setTopbarPanel(null)} states={states} selectedProjectId={selectedProjectId}/>
+          <div className="topbar-actions">
+            <CommandLauncher open={topbarPanel === "search"} onOpen={() => setTopbarPanel("search")} onClose={() => setTopbarPanel(null)} states={states}/>
+            <div className="topbar-desktop-actions">
+              {contextMode && <span className={`session-context ${projectContext?.mode || ""}`}><Radio size={14}/>{contextMode}</span>}
+              {active > 0 && <Link className="topbar-events" to="/events" aria-label={`${active} open events`}><Bell size={15}/><span>Events</span><b>{active}</b></Link>}
+              <SystemStatus open={topbarPanel === "status"} onToggle={() => setTopbarPanel(topbarPanel === "status" ? null : "status")} onClose={() => setTopbarPanel(null)} connected={connected} health={health} reporting={reporting} devices={devices}/>
+              <ThemeSwitcher compact/>
+            </div>
+            <div className="topbar-mobile-actions">
+              <div className="topbar-control-wrap">
+                <button className="topbar-overflow-trigger" type="button" aria-label="More workspace status" aria-haspopup="dialog" aria-expanded={topbarPanel === "overflow"} onClick={() => setTopbarPanel(topbarPanel === "overflow" ? null : "overflow")}><MoreHorizontal size={18}/>{active > 0 && <span>{active}</span>}</button>
+                {(topbarPanel === "overflow" || overflowClass === "is-closing") && (
+                  <button className="topbar-popover-dismiss" type="button" aria-label="Close workspace status" onClick={() => setTopbarPanel(null)}/>
+                )}
+                <section className={`t-dropdown topbar-popover mobile-topbar-popover ${overflowClass}`} data-origin="top-right" role="dialog" aria-label="Workspace status and preferences" aria-hidden={topbarPanel !== "overflow"} inert={topbarPanel !== "overflow" ? true : undefined}>
+                  {contextMode && <div className="mobile-context-row"><span>Current source</span><strong><Radio size={14}/>{contextMode}</strong></div>}
+                  {active > 0 && <Link className="mobile-event-row" to="/events"><span><Bell size={15}/>Open events</span><strong>{active}</strong></Link>}
+                  <div className="popover-heading"><strong>System status</strong></div>
+                  <HealthRows connected={connected} health={health} reporting={reporting} devices={devices}/>
+                  <div className="mobile-theme-row"><span>Appearance</span><ThemeSwitcher compact/></div>
+                </section>
+              </div>
+            </div>
           </div>
-          <div className="topbar-actions"><ThemeSwitcher compact/><Badge tone={connected ? "success" : "warning"}>
-            {connected ? "Backend connected" : "Reconnecting"}
-          </Badge></div>
         </header>
         {error && (
           <div className="error" role="alert">
@@ -223,7 +521,7 @@ function App() {
             />
             <Route
               path="/projects/:id"
-              element={<Workspace connected={connected} />}
+              element={<Workspace connected={connected} onContextChange={updateProjectContext} />}
             />
             <Route path="/projects/new" element={<AddProject />} />
             <Route path="/events" element={<GlobalEvents states={states} />} />
@@ -469,7 +767,7 @@ function Stat({
     </div>
   );
 }
-function Workspace({ connected }: { connected: boolean }) {
+function Workspace({ connected, onContextChange }: { connected: boolean; onContextChange: (context: ProjectContext) => void }) {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [agentWidth, setAgentWidth] = useState(() => Number(localStorage.getItem("agentwin-agent-width")) || 380);
@@ -523,6 +821,9 @@ function Workspace({ connected }: { connected: boolean }) {
       socket?.close();
     };
   }, [refresh, id, sid]);
+  useEffect(() => {
+    if (state) onContextChange({ projectId: state.project.id, mode: state.session.mode });
+  }, [state?.project.id, state?.session.mode, onContextChange]);
   if (!state)
     return (
       <main className="page">
