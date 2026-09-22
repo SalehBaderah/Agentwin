@@ -3,13 +3,14 @@ import { Activity, Cable, CircleAlert, Radio } from "lucide-react";
 import type { State } from "../../types";
 import { time } from "../../types";
 import { useTwinState } from "./hooks/useTwinState";
-import { LiveTwinScene } from "./live/LiveTwinScene";
 import { TwinInspector } from "./TwinInspector";
 import "./live-twin.css";
 
 const TopologyTwin = lazy(() => import("./topology/TopologyTwin").then((module) => ({ default: module.TopologyTwin })));
+const PhysicalTwin = lazy(() => import("./view2d/PhysicalTwin").then((module) => ({ default: module.PhysicalTwin })));
+const DataFlowTwin = lazy(() => import("./view2d/DataFlowTwin").then((module) => ({ default: module.DataFlowTwin })));
 
-type View = "live" | "topology";
+type View = "physical" | "topology" | "flow";
 
 const age = (received?: number) => {
   if (!received) return "No telemetry";
@@ -23,8 +24,8 @@ const age = (received?: number) => {
 
 export function DigitalTwin({ state, selectedId, onSelect, refresh }: { state: State; selectedId: string | null; onSelect: (id: string) => void; refresh: () => void }) {
   const twin = useTwinState(state);
-  const [view, setView] = useState<View>("live");
-  const [inspectorOpen, setInspectorOpen] = useState(() => !matchMedia("(max-width: 760px)").matches);
+  const [view, setView] = useState<View>("physical");
+  const [inspectorOpen, setInspectorOpen] = useState(false);
   const bar = useRef<HTMLDivElement>(null);
   const pill = useRef<HTMLSpanElement>(null);
   const defaultComponent = twin.components.find((component) => component.type === "actuator") || twin.components[0];
@@ -54,12 +55,6 @@ export function DigitalTwin({ state, selectedId, onSelect, refresh }: { state: S
     window.addEventListener("keydown", escape);
     return () => window.removeEventListener("keydown", escape);
   }, []);
-  useEffect(() => {
-    const media = matchMedia("(max-width: 760px)");
-    const update = () => setInspectorOpen(!media.matches);
-    media.addEventListener("change", update);
-    return () => media.removeEventListener("change", update);
-  }, []);
   const choose = (id: string) => { onSelect(id); setInspectorOpen(true); };
   const activity = useMemo(() => [
     ...state.readings.slice(-4).map((reading) => ({ id: `r-${reading.id}`, at: reading.received, type: "Telemetry", label: reading.device || "Packet" })),
@@ -73,8 +68,9 @@ export function DigitalTwin({ state, selectedId, onSelect, refresh }: { state: S
       <div><span className={`session-kicker ${twin.sessionLabel.toLowerCase()}`}>{twin.sessionLabel}</span><h3>Digital Twin</h3><p>Configured structure enriched with session-scoped observations.</p></div>
       <div ref={bar} className="t-tabs twin-view-switch" role="tablist" aria-label="Digital Twin view">
         <span ref={pill} className="t-tabs-pill" aria-hidden="true"/>
-        <button type="button" className="t-tab" role="tab" aria-selected={view === "live"} onClick={() => setView("live")}>Live Twin</button>
+        <button type="button" className="t-tab" role="tab" aria-selected={view === "physical"} onClick={() => setView("physical")}>Physical 2D</button>
         <button type="button" className="t-tab" role="tab" aria-selected={view === "topology"} onClick={() => setView("topology")}>Topology</button>
+        <button type="button" className="t-tab" role="tab" aria-selected={view === "flow"} onClick={() => setView("flow")}>Data Flow</button>
       </div>
     </header>
     <div className="twin-status-bar" role="status" aria-live="polite">
@@ -84,8 +80,14 @@ export function DigitalTwin({ state, selectedId, onSelect, refresh }: { state: S
       <span><Cable size={14}/>{state.session.mode} session · {time(state.session.created)}</span>
       <span><CircleAlert size={14}/>{twin.openEvents} open events</span>
     </div>
-    <div className={`twin-view-frame ${view === "live" ? "is-live" : "is-topology"}`}>
-      {view === "live" ? <div className="live-twin-stage"><LiveTwinScene twin={twin} selectedId={selected.id} onSelect={choose}/><TwinInspector component={selected} state={state} refresh={refresh} open={inspectorOpen} onClose={() => setInspectorOpen(false)}/>{inspectorOpen && <button className="inspector-backdrop" aria-label="Close component inspector" onClick={() => setInspectorOpen(false)}/>}</div> : <Suspense fallback={<div className="chart-empty"><Activity/><strong>Loading topology</strong><p>Preparing the engineering view.</p></div>}><div className="live-twin-stage"><TopologyTwin key={state.project.id} twin={twin} selectedId={selected.id} onSelect={choose}/><TwinInspector component={selected} state={state} refresh={refresh} open={inspectorOpen} onClose={() => setInspectorOpen(false)}/>{inspectorOpen && <button className="inspector-backdrop" aria-label="Close component inspector" onClick={() => setInspectorOpen(false)}/>}</div></Suspense>} 
+    <div className={`twin-view-frame is-${view}`}>
+      <div className={`live-twin-stage ${inspectorOpen ? "inspector-open" : ""}`}>
+        <Suspense fallback={<div className="chart-empty"><Activity/><strong>Loading {view === "physical" ? "hardware" : view === "flow" ? "data paths" : "topology"}</strong><p>Preparing the view.</p></div>}>
+          {view === "physical" ? <PhysicalTwin twin={twin} selectedId={selected.id} onSelect={choose}/> : view === "flow" ? <DataFlowTwin twin={twin} selectedId={selected.id} onSelect={choose}/> : <TopologyTwin key={state.project.id} twin={twin} selectedId={selected.id} onSelect={choose}/>}
+        </Suspense>
+        <TwinInspector component={selected} state={state} refresh={refresh} open={inspectorOpen} onClose={() => setInspectorOpen(false)}/>
+        {inspectorOpen && <button className="inspector-backdrop" aria-label="Close component inspector" onClick={() => setInspectorOpen(false)}/>}
+      </div>
     </div>
     <footer className="twin-activity"><div><strong>Recent activity</strong><span>Selected session only</span></div>{activity.length ? <ol>{activity.map((item) => <li key={item.id}><i className={item.type.toLowerCase()}/><span>{item.type}<small>{item.label}</small></span><time>{time(item.at)}</time></li>)}</ol> : <p>No observations, commands, or events in this session.</p>}</footer>
     <div className="twin-legend" aria-label="Relationship legend">{relationshipKinds.map((kind) => <span key={kind} className={kind}><i/>{kind === "data" ? "Observed data" : kind === "control" ? "Command" : kind}</span>)}</div>
