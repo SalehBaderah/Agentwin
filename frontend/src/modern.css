@@ -143,9 +143,11 @@ option {
   padding: 0 8px 30px;
 }
 .brand svg {
-  color: var(--accent-text);
+  color: var(--text-primary);
   flex-shrink: 0;
 }
+.brand-mark-physical { fill: currentColor; }
+.brand-mark-digital { fill: #7c3aed; }
 .version {
   font-size: 9px;
   background: var(--surface-hover);
