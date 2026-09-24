@@ -29,9 +29,9 @@ import {
   Radio,
   Plus,
   Power,
-  MessageSquare,
   Menu,
   MoreHorizontal,
+  PanelRightClose,
   Search,
   Send,
   Settings as SettingsIcon,
@@ -50,6 +50,7 @@ import {
 import "@xyflow/react/dist/style.css";
 import type { Answer, Component, Event as ProjectEvent, Project, State } from "./types";
 import { api, display, strings, time } from "./types";
+import { ProjectMonitoringSettings } from "./MonitoringSettings";
 import "@fontsource-variable/dm-sans";
 import "@fontsource-variable/manrope";
 import "./tokens.css";
@@ -58,6 +59,9 @@ import "./styles.css";
 import "./modern.css";
 import { ThemeProvider, ThemeSwitcher } from "./theme";
 import { Dialog, Tabs } from "./ui";
+
+const summaryTime = (value: number) => new Date(value * 1000).toLocaleString("en-US", { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+const emailStatus = (status: string, enabled: boolean) => status === "not_configured" && !enabled ? "off" : status.replace("_", " ");
 
 const DigitalTwin = lazy(() => import("./features/digital-twin/DigitalTwin").then((module) => ({ default: module.DigitalTwin })));
 
@@ -105,6 +109,8 @@ type ServiceHealth = {
   mqtt: boolean;
   agent_configured: boolean;
   agent_available: boolean;
+  email_configured: boolean;
+  email_default_recipient_configured: boolean;
   mqtt_rejections: number;
 };
 
@@ -529,7 +535,7 @@ function App() {
             />
             <Route path="/projects/new" element={<AddProject />} />
             <Route path="/events" element={<GlobalEvents states={states} />} />
-            <Route path="/settings" element={<GlobalSettings />} />
+            <Route path="/settings" element={<GlobalSettings states={states} />} />
             <Route
               path="*"
               element={
@@ -698,8 +704,8 @@ function Overview({
               <div>
                 <strong>
                   {e.kind === "missing_telemetry"
-                    ? "Telemetry is missing"
-                    : "Reading above configured limit"}
+                    ? "Device telemetry is missing"
+                    : "Configured limit breached"}
                 </strong>
                 <small>
                   {e.project.name} · {e.evidence.rule}
@@ -775,6 +781,7 @@ function Workspace({ connected, onContextChange }: { connected: boolean; onConte
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [agentWidth, setAgentWidth] = useState(() => Number(localStorage.getItem("agentwin-agent-width")) || 380);
+  const [agentCollapsed, setAgentCollapsed] = useState(() => window.matchMedia("(max-width: 760px)").matches || localStorage.getItem("agentwin-collapsed") === "true");
   const { id } = useParams();
   const navigate = useNavigate();
   const [state, setState] = useState<State | null>(null),
@@ -828,6 +835,20 @@ function Workspace({ connected, onContextChange }: { connected: boolean; onConte
   useEffect(() => {
     if (state) onContextChange({ projectId: state.project.id, mode: state.session.mode });
   }, [state?.project.id, state?.session.mode, onContextChange]);
+  useEffect(() => {
+    const mobile = window.matchMedia("(max-width: 760px)");
+    const adapt = () => setAgentCollapsed(mobile.matches || localStorage.getItem("agentwin-collapsed") === "true");
+    mobile.addEventListener("change", adapt);
+    return () => mobile.removeEventListener("change", adapt);
+  }, []);
+  useEffect(() => {
+    if (agentCollapsed) return;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && window.matchMedia("(max-width: 760px)").matches) setAgentCollapsed(true);
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [agentCollapsed]);
   if (!state)
     return (
       <main className="page">
@@ -866,6 +887,11 @@ function Workspace({ connected, onContextChange }: { connected: boolean; onConte
     setAgentWidth(nextWidth);
     localStorage.setItem("agentwin-agent-width", String(nextWidth));
   };
+  const toggleAgent = () => {
+    const next = !agentCollapsed;
+    setAgentCollapsed(next);
+    if (!window.matchMedia("(max-width: 760px)").matches) localStorage.setItem("agentwin-collapsed", String(next));
+  };
   return (
     <main className="page project-page"><Dialog open={deleteOpen} onClose={() => { if (!deleting) setDeleteOpen(false); }} title="Delete project?"><p>Delete {p.name} and all of its stored sessions, readings, events, and actions?</p><p className="danger-note">This cannot be undone.</p><div className="dialog-actions"><button autoFocus onClick={() => setDeleteOpen(false)} disabled={deleting}>Cancel</button><button className="danger" disabled={deleting} onClick={removeProject}>{deleting ? "Deleting?" : "Delete project"}</button></div></Dialog>
       <Link className="back" to="/projects">
@@ -882,7 +908,11 @@ function Workspace({ connected, onContextChange }: { connected: boolean; onConte
             </p>
           )}
         </div>
-        <div className="project-actions"><label className="source-picker">Session<select value={state.session.id} onChange={(event) => setSid(event.target.value)}>{state.sessions.map((session) => <option key={session.id} value={session.id}>{session.mode} · {time(session.created)}</option>)}</select></label><button className="ghost project-manage" onClick={() => setDeleteOpen(true)}>Manage project</button></div>
+        <div className="project-actions">
+          <label className="source-picker">Session<select value={state.session.id} onChange={(event) => setSid(event.target.value)}>{state.sessions.map((session) => <option key={session.id} value={session.id}>{session.mode} · {time(session.created)}</option>)}</select></label>
+          <Link className="button ghost project-manage" to={`/settings?project=${p.id}`}>Monitoring settings</Link>
+          <button className="ghost project-manage" onClick={() => setDeleteOpen(true)}>Manage project</button>
+        </div>
       </div>
       <div className="status-line">
         <Badge>{state.session.mode} session</Badge>
@@ -933,7 +963,7 @@ function Workspace({ connected, onContextChange }: { connected: boolean; onConte
         />
       </div>
       <div className="source-note">{state.session.mode === "live" ? "Live data is scoped to this project and its registered devices." : "Test data is isolated from live device state and never routes physical commands."}</div>
-      <div className="workspace-grid" style={{ "--agent-width": `${agentWidth}px` } as React.CSSProperties}>
+      <div className={`workspace-grid ${agentCollapsed ? "win-collapsed" : ""}`} style={{ "--agent-width": `${agentWidth}px` } as React.CSSProperties}>
         <section className="workspace-main">
           <Tabs value={tab} onChange={setTab} items={[["overview", "Overview"], ["readings", "Live readings"], ["twin", "Digital twin"], ["events", "Events & history"], ["controls", "Controls"]]}/>
           <div className="tab-content" id="project-panel" role="tabpanel" aria-labelledby={`tab-${tab}`} tabIndex={0}>
@@ -946,8 +976,12 @@ function Workspace({ connected, onContextChange }: { connected: boolean; onConte
             {tab === "controls" && <ControlsPanel state={state} refresh={refresh} />}
           </div>
         </section>
-        <button className="workspace-resizer" type="button" aria-label="Resize agent panel" title="Drag to resize; use arrow keys; double-click to reset" onPointerDown={startAgentResize} onKeyDown={nudgeAgentWidth} onDoubleClick={() => { setAgentWidth(380); localStorage.setItem("agentwin-agent-width", "380"); }} />
-        <aside className="workspace-agent"><AgentPanel state={state}/></aside>
+        {!agentCollapsed && <button className="workspace-resizer" type="button" aria-label="Resize agent panel" title="Drag to resize; use arrow keys; double-click to reset" onPointerDown={startAgentResize} onKeyDown={nudgeAgentWidth} onDoubleClick={() => { setAgentWidth(380); localStorage.setItem("agentwin-agent-width", "380"); }} />}
+        <aside className={`workspace-agent ${agentCollapsed ? "is-collapsed" : "is-expanded"}`} aria-label="Win project assistant" onKeyDown={(event) => { if (event.key === "Escape" && !agentCollapsed) toggleAgent(); }}>
+          {!agentCollapsed && <button className="win-drawer-backdrop" type="button" aria-label="Close Win" onClick={toggleAgent}/>}
+          {agentCollapsed && <button className="win-rail" type="button" aria-label="Open Win assistant" aria-expanded="false" onClick={toggleAgent}><img src="/assets/win.webp" alt=""/><strong>Win</strong></button>}
+          <div className="win-panel-wrap" hidden={agentCollapsed}><AgentPanel key={`${state.project.id}:${state.session.id}`} state={state} onCollapse={toggleAgent}/></div>
+        </aside>
       </div>
     </main>
   );
@@ -1003,11 +1037,74 @@ function ControlsPanel({ state, refresh }: { state: State; refresh: () => void }
   return <div className="controls-view"><div className="view-heading"><div><h3>Hardware controls</h3><p>Commands remain pending until the target device reports the expected state.</p></div></div>{controls.length ? controls.map(({ component, control }) => { const latestAction = state.actions.find((action) => action.target === component.id); const current = state.latest?.readings[control.expected.field]; const ready = controlReady(state, state.project, control); return <section className="panel control-card" key={`${component.id}-${control.action}`}><div className="control-heading"><div><h4>{component.name}</h4><p>{control.label}</p></div><Badge tone={latestAction?.status === "completed" ? "success" : latestAction?.status === "requested" ? "warning" : ""}>{latestAction?.status?.replace("_", " ") || "ready"}</Badge></div><div className="control-state"><span>Reported state<strong>{metricValue(current, 0)}</strong></span><span>Verification field<strong>{control.expected.field}</strong></span><span>Last request<strong>{latestAction ? latestAction.action.replace(":", " ") : "None"}</strong></span></div><div className="component-actions"><button className="primary" disabled={!ready || latestAction?.status === "requested"} onClick={() => run(component, control.action, true)}>Turn on</button><button className="secondary-button" disabled={!ready || latestAction?.status === "requested"} onClick={() => run(component, control.action, false)}>Turn off</button></div>{latestAction?.status === "requested" && <p className="verification-note"><Activity size={14}/> Waiting for matching device telemetry. The reported state has not been confirmed yet.</p>}{!ready && <p className="detail-empty">Connect the configured live transport before controlling this component.</p>}</section>; }) : <div className="empty"><ShieldCheck/><h3>No hardware controls configured</h3><p>This project is read-only until a device capability and verification contract are registered.</p></div>}<p role="status">{message}</p></div>;
 }
 
-function AgentPanel({ state }: { state: State }) {
-  const [question, setQuestion] = useState(""), [answer, setAnswer] = useState<Answer | null>(null), [busy, setBusy] = useState(false), [agentError, setAgentError] = useState("");
-  const ask = async () => { if (!question.trim()) return; setBusy(true); setAgentError(""); try { setAnswer(await api<Answer>(`/projects/${state.project.id}/sessions/${state.session.id}/agent`, { question })); } catch (error) { setAgentError((error as Error).message); } finally { setBusy(false); } };
+function WinAvatar({ className = "" }: { className?: string }) {
+  return <img className={`win-avatar ${className}`} src="/assets/win.webp" alt="" width="44" height="44" decoding="async"/>;
+}
+
+function AgentPanel({ state, onCollapse }: { state: State; onCollapse?: () => void }) {
+  const [question, setQuestion] = useState("");
+  const [submittedQuestion, setSubmittedQuestion] = useState("");
+  const [answer, setAnswer] = useState<Answer | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [agentError, setAgentError] = useState("");
+  const ask = async (value = question) => {
+    if (!value.trim() || busy) return;
+    setBusy(true);
+    setAgentError("");
+    setAnswer(null);
+    setSubmittedQuestion(value);
+    try {
+      setAnswer(await api<Answer>(`/projects/${state.project.id}/sessions/${state.session.id}/agent`, { question: value }));
+    } catch (error) {
+      setAgentError((error as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
   const prompts = ["What is the current state?", "What changed recently?", "Explain active events", "Which actions are permitted?"];
-  return <section className="panel agent-mini"><div className="agent-mini-heading"><span><MessageSquare size={18}/></span><div><h3>Project agent</h3><p>Explains this system using stored evidence.</p></div></div><div className="agent-context"><span>Project scope</span><strong>{state.project.name}</strong><small>{state.session.mode} session · {state.status}</small></div><div className="agent-prompts">{prompts.map(prompt=><button type="button" key={prompt} onClick={()=>setQuestion(prompt)}>{prompt}</button>)}</div><div className="agent-question"><textarea aria-label="Question for project agent" rows={3} value={question} onChange={(event) => setQuestion(event.target.value)} placeholder="Ask about a reading, change, event, or allowed action"/><button onClick={ask} disabled={busy || !question.trim()} aria-label="Ask project agent"><Send size={16}/>{busy ? "Checking evidence…" : "Ask agent"}</button></div>{agentError && <p className="error" role="alert">{agentError}</p>}{answer && <div aria-live="polite" className={`agent-answer ${answer.available ? "" : "unavailable"}`}><div><span>Finding</span><strong>{answer.finding}</strong></div>{answer.evidence.length>0&&<div><span>Evidence</span>{answer.evidence.slice(0,3).map(item=><small key={item.id}>{item.id} · {time(item.timestamp)}</small>)}</div>}<div><span>Uncertainty</span><p>{answer.uncertainty}</p></div><div><span>Next step</span><p>{answer.next_step}</p></div></div>}<p className="agent-guardrail">Actions require backend permission and operator confirmation. Device telemetry verifies completion.</p></section>;
+  const latestSummary = state.summaries?.[0];
+  return <section className="panel agent-mini win-panel" aria-label="Win project assistant">
+    <div className="agent-mini-heading win-heading">
+      <WinAvatar/>
+      <div className="win-heading-copy"><h3>Win</h3><p>Project AI Assistant</p></div>
+      {onCollapse && <button className="win-collapse" type="button" aria-label="Collapse Win assistant" title="Collapse Win" onClick={onCollapse}><PanelRightClose size={17}/></button>}
+    </div>
+    <div className="agent-context win-context">
+      <span>Project context</span>
+      <strong title={state.project.name}>{state.project.name}</strong>
+      <small><i className={`win-status-dot ${state.status === "reporting" ? "is-reporting" : ""}`}/>{sessionLabel(state.session.mode)} session <span aria-hidden="true">·</span> {state.status}</small>
+    </div>
+    <section className="win-summary" aria-label="Latest scheduled summary">
+      <div className="win-summary-heading"><div className="win-summary-brand"><Mark/><strong>Agentwin summary</strong></div><span>{state.project.monitoring.summary_interval_minutes} min</span></div>
+      {latestSummary ? <><time dateTime={new Date(latestSummary.period_end * 1000).toISOString()}>{summaryTime(latestSummary.period_end)}</time><p>{latestSummary.body}</p><div className="win-summary-footer"><span>{latestSummary.source === "local_model" ? "AI-assisted" : "Evidence summary"} · Email {emailStatus(latestSummary.email_status, state.project.monitoring.summary_email_enabled)}</span><Link to="/events">View in Events</Link></div></> : <p className="win-summary-pending">{state.project.monitoring.summary_enabled ? "The first live summary will appear after the next interval." : "Summaries are off for this project."}</p>}
+    </section>
+    <div className="win-suggestions">
+      <span className="win-section-label">Suggested questions</span>
+      <div className="agent-prompts">{prompts.map((prompt) => <button type="button" key={prompt} onClick={() => setQuestion(prompt)}>{prompt}</button>)}</div>
+    </div>
+    {!submittedQuestion && !busy && !agentError && !answer && <div className="win-empty-state">
+      <WinAvatar/>
+      <strong>Ask Win about this project</strong>
+      <p>Explore readings, events, and permitted actions in this session.</p>
+    </div>}
+    {(submittedQuestion || busy || agentError || answer) && <div className="win-conversation" role="log" aria-label="Win conversation" aria-live="polite">
+      {submittedQuestion && <div className="win-operator"><span>Operator</span><p>{submittedQuestion}</p></div>}
+      {busy && <div className="win-assistant win-thinking"><WinAvatar/><div><span>Win</span><p>Checking project evidence…</p></div></div>}
+      {agentError && <div className="win-error" role="alert"><p>{agentError}</p><button type="button" onClick={() => void ask(submittedQuestion)}>Retry</button></div>}
+      {answer && <div className="win-assistant"><WinAvatar/><div className={`agent-answer win-response ${answer.available ? "" : "unavailable"}`}>
+        <span>Win</span>
+        <div><span>Finding</span><strong>{answer.finding}</strong></div>
+        {answer.evidence.length > 0 && <div className="win-evidence"><span>Evidence</span>{answer.evidence.slice(0, 3).map((item) => <small key={item.id}>{item.id} · {time(item.timestamp)}</small>)}{answer.evidence.length > 3 && <details><summary>Show {answer.evidence.length - 3} more references</summary>{answer.evidence.slice(3).map((item) => <small key={item.id}>{item.id} · {time(item.timestamp)}</small>)}</details>}</div>}
+        <div><span>Uncertainty</span><p>{answer.uncertainty}</p></div>
+        <div><span>Next step</span><p>{answer.next_step}</p></div>
+      </div></div>}
+    </div>}
+    <div className="agent-question win-composer">
+      <textarea aria-label="Ask Win about this system" rows={2} value={question} onChange={(event) => setQuestion(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); void ask(); } }} placeholder="Ask Win about this system..." disabled={busy}/>
+      <button type="button" onClick={() => void ask()} disabled={busy || !question.trim()} aria-label="Send question to Win" title="Send question"><Send size={17}/></button>
+    </div>
+    <p className="agent-guardrail">Actions require backend permission and operator confirmation. Device telemetry verifies completion.</p>
+  </section>;
 }
 
 export function LegacyAddProject() {
@@ -1111,20 +1208,20 @@ function Events({ state, refresh }: { state: State; refresh: () => void }) {
             <button className="event-select" onClick={() => setSelected(e)}>
               <Bell size={17} />
               <span>
-                <strong>{e.kind === "missing_telemetry" && e.evidence.readings.length === 0 ? "Initial connection delay" : e.kind.replaceAll("_", " ")}</strong>
+                <strong>{e.kind === "missing_telemetry" ? "Device silent" : "Threshold breached"}</strong>
                 <small>
                   {e.evidence.rule} · {time(e.created)}
                 </small>
               </span>
               <Badge tone={e.recovered ? "success" : "warning"}>
-                {e.recovered ? "Recovered" : "Open"}
+                {e.recovered ? e.evidence.close_reason ? "Closed" : "Recovered" : "Open"}
               </Badge>
             </button>
             <div className="event-actions">
               <span>
                 {e.recovered
-                  ? "Recovery " + time(e.recovered)
-                  : "Cause unknown"}
+                  ? (e.evidence.close_reason ? "Closed " : "Recovery ") + time(e.recovered)
+                  : "Cause unknown"} · Email {emailStatus(e.email_status, state.project.monitoring.alert_email_enabled)}
               </span>
               <button
                 disabled={!!e.acknowledged}
@@ -1151,6 +1248,7 @@ function Events({ state, refresh }: { state: State; refresh: () => void }) {
           </p>
         </div>
       )}
+      <section className="event-summaries" aria-label="Scheduled live summaries"><div className="section-heading"><h3>Scheduled live summaries</h3><span>Informational, not open alerts</span></div>{state.summaries?.length ? state.summaries.map((summary) => <article className="event-summary-item" key={summary.id}><div><strong>{summaryTime(summary.period_end)}</strong><small>{Math.round((summary.period_end - summary.period_start) / 60)}-minute live window · {summary.source === "local_model" ? "AI-assisted" : "Evidence summary"}</small></div><p>{summary.body}</p><small>Email {emailStatus(summary.email_status, state.project.monitoring.summary_email_enabled)}</small></article>) : <p className="monitoring-empty">No scheduled live summaries yet.</p>}</section>
       {selected && (
         <div className="evidence-detail">
           <div className="section-heading">
@@ -1163,9 +1261,9 @@ function Events({ state, refresh }: { state: State; refresh: () => void }) {
               <X size={16} />
             </button>
           </div>
-          <div className="evidence-status"><Badge tone={selected.recovered ? "success" : "warning"}>{selected.recovered ? "Recovered" : "Open"}</Badge><span>{selected.acknowledged ? "Acknowledged" : "Not acknowledged"}</span></div>
-          <h4>{selected.kind === "missing_telemetry" && selected.evidence.readings.length === 0 ? "Agentwin was waiting for the first device sample" : selected.evidence.rule}</h4>
-          <p>{selected.kind === "missing_telemetry" && selected.evidence.readings.length === 0 ? "No sample had been received in this session. This was an initial setup or connection delay, not evidence that a previously reporting device failed." : "Telemetry stopped after the device had reported. The interruption is observable, but its physical or network cause is not established."}</p>
+          <div className="evidence-status"><Badge tone={selected.recovered ? "success" : "warning"}>{selected.recovered ? selected.evidence.close_reason ? "Closed" : "Recovered" : "Open"}</Badge><span>{selected.acknowledged ? "Acknowledged" : "Not acknowledged"}</span></div>
+          <h4>{selected.evidence.rule}</h4>
+          <p>{selected.evidence.close_reason || (selected.kind === "missing_telemetry" ? "Telemetry stopped after this device had reported. The physical or network cause is not established." : "Two recent readings crossed the configured limit. The physical cause is not established.")}</p>
           <div className="evidence-facts"><div><span>Detected</span><strong>{time(selected.created)}</strong></div><div><span>Recovered</span><strong>{selected.recovered ? time(selected.recovered) : "Not yet"}</strong></div><div><span>Duration</span><strong>{selected.recovered ? `${Math.max(1,Math.round(selected.recovered-selected.created))} seconds` : "Ongoing"}</strong></div><div><span>Source</span><strong>{selected.evidence.source_mode}</strong></div></div>
           <small>
             Event {selected.id} · {selected.evidence.source_mode}
@@ -1195,7 +1293,7 @@ function GlobalEvents({ states }: { states: State[] }) {
           <div className="eyebrow">Evidence and recovery</div>
           <h1>Events across your systems.</h1>
           <p>
-            Events from the live LED hardware session.
+            Live-session alerts and scheduled project summaries.
           </p>
         </div>
       </div>
@@ -1215,7 +1313,7 @@ function GlobalEvents({ states }: { states: State[] }) {
                   <strong>{e.evidence.rule}</strong>
                   <small>
                     {time(e.created)} ·{" "}
-                    {e.acknowledged ? "Acknowledged" : "Not acknowledged"}
+                    {e.acknowledged ? "Acknowledged" : "Not acknowledged"} · Email {emailStatus(e.email_status, s.project.monitoring.alert_email_enabled)}
                   </small>
                 </div>
                 <Badge tone={e.recovered ? "success" : "warning"}>
@@ -1223,24 +1321,17 @@ function GlobalEvents({ states }: { states: State[] }) {
                 </Badge>
               </div>
             ))
-          ) : (
-            <p>No recorded events.</p>
-          )}
+          ) : <p>No recorded alerts.</p>}
+          {s.summaries?.length > 0 && <div className="global-summaries"><h3>Recent summaries</h3>{s.summaries.slice(0, 3).map((summary) => <div className="global-summary-row" key={summary.id}><span>{summaryTime(summary.period_end)}</span><p>{summary.body}</p></div>)}</div>}
         </section>
       ))}
     </main>
   );
 }
-function GlobalSettings() {
-  const [health, setHealth] = useState<{
-    mqtt: boolean;
-    agent_configured: boolean;
-    mqtt_rejections: number;
-  } | null>(null);
+function GlobalSettings({ states }: { states: State[] }) {
+  const [health, setHealth] = useState<ServiceHealth | null>(null);
   useEffect(() => {
-    api<{ mqtt: boolean; agent_configured: boolean; mqtt_rejections: number }>(
-      "/health",
-    )
+    api<ServiceHealth>("/health")
       .then(setHealth)
       .catch(() => {});
   }, []);
@@ -1249,12 +1340,11 @@ function GlobalSettings() {
       <div className="page-heading">
         <div>
           <div className="eyebrow">Workspace configuration</div>
-          <h1>Ready when your hardware is.</h1>
-          <p>
-            Local monitoring works independently of the broker and AI provider.
-          </p>
+          <h1>Settings</h1>
+          <p>Configure live alerts, Win summaries, and email delivery for each project.</p>
         </div>
       </div>
+      <ProjectMonitoringSettings states={states} emailConfigured={health?.email_configured ?? false} defaultRecipientConfigured={health?.email_default_recipient_configured ?? false}/>
       <section className="panel appearance-settings"><div><h2>Appearance</h2><p>Choose a theme, or follow your device. Your preference is saved in this browser.</p></div><ThemeSwitcher/></section>
       <section className="panel settings-content">
         <h2>Service availability</h2>
@@ -1278,17 +1368,16 @@ function GlobalSettings() {
         </div>
         <h3>Setup notes</h3>
         <p>
-          Configure credentials in the backend .env file. Device identity, field
-          mapping, freshness, and inventory are available under each project's
-          Setup tab.
+          Configure provider and SMTP credentials in the backend .env file. Device identity,
+          field mapping, and inventory are defined when a project is created.
         </p>
         <p>
           The MVP binds to loopback. See docs/hardware.md before connecting a
           device or exposing the broker to a private network.
         </p>
         <p>
-          Physical control, RF calibration, trained anomaly models, and
-          behavioral simulation are unavailable.
+          RF calibration, trained anomaly models, and behavioral simulation are
+          unavailable. Physical control is limited to declared capabilities.
         </p>
       </section>
     </main>
