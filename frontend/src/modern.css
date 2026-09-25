@@ -184,10 +184,6 @@ p,
   background: var(--surface);
   box-shadow: var(--light-specular);
 }
-.stats {
-  border-radius: var(--radius-panel);
-  overflow: hidden;
-}
 .section-heading {
   margin: 28px 0 14px;
 }
@@ -313,23 +309,6 @@ p,
 .detail-relation {
   font-size: 13px;
 }
-.overview-card {
-  padding: 18px;
-}
-.overview-row strong {
-  font-size: 13px;
-}
-.overview-metrics {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-.metric-chart {
-  border-radius: var(--radius-control);
-  background: var(--background-secondary);
-}
-.chart-header {
-  gap: 16px;
-  flex-wrap: wrap;
-}
 .event-row {
   gap: 14px;
   padding: 18px 20px;
@@ -344,16 +323,6 @@ p,
 .event-row small,
 .event-row time {
   font-size: 12px;
-}
-.control-state span {
-  font-size: 13px;
-  padding: 14px 10px;
-}
-.control-card {
-  border-color: var(--border-strong);
-}
-.verification-note {
-  font-size: 13px;
 }
 .onboarding {
   padding: 28px;
@@ -456,14 +425,6 @@ p,
 .monitoring-actions { align-items: center; border-top: 1px solid var(--border); padding-top: 18px; }
 .monitoring-actions p { margin: 0; font-size: 13px; }
 .monitoring-actions .error-text { color: var(--danger); }
-.event-summaries { margin-top: 30px; padding-top: 22px; border-top: 1px solid var(--border); }
-.event-summaries .section-heading { margin-bottom: 12px; }
-.event-summaries .section-heading span { color: var(--text-muted); font-size: 12px; }
-.event-summary-item { padding: 15px 0; border-top: 1px solid var(--border); }
-.event-summary-item > div { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 4px 12px; }
-.event-summary-item strong { font-size: 13px; }
-.event-summary-item small { color: var(--text-muted); font-size: 11px; }
-.event-summary-item p { margin: 9px 0; font-size: 13px; line-height: 1.55; }
 .global-summaries { margin-top: 20px; border-top: 1px solid var(--border); padding-top: 18px; }
 .global-summaries h3 { margin-bottom: 12px; font-size: 14px; }
 .global-summary-row { padding: 10px 0; border-top: 1px solid var(--border); }
@@ -584,17 +545,11 @@ p,
   .agent-mini > * {
     width: 100%;
   }
-  .overview-split {
-    grid-template-columns: minmax(0, 1fr);
-  }
   .tabs .t-tab {
     padding-inline: 12px;
   }
   .onboarding {
     padding: 20px;
-  }
-  .control-state {
-    grid-template-columns: minmax(0, 1fr);
   }
   .event-row {
     flex-wrap: wrap;
