@@ -113,8 +113,53 @@
 .twin-view-frame { min-height: 560px; animation: twin-view-in var(--duration-fast) var(--ease-smooth-out); }
 @keyframes twin-view-in { from { opacity: .45; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 .live-twin-stage { display: grid; grid-template-columns: minmax(0, 1fr) 318px; height: 560px; }
+.live-twin-stage:not(.inspector-open) { grid-template-columns: minmax(0, 1fr); }
+.live-twin-stage:not(.inspector-open) .live-twin-inspector { display: none; }
 .live-twin-canvas { position: relative; min-width: 0; height: 560px; overflow: hidden; background: var(--background); border-right: 1px solid var(--border); touch-action: none; }
-.live-twin-canvas canvas { outline: none; }
+.physical-view, .flow-view { background: #0e1520; }
+.twin2d-svg { display: block; width: 100%; height: 100%; touch-action: none; user-select: none; }
+.twin2d-caption { position: absolute; top: 14px; left: 16px; z-index: 2; display: grid; gap: 3px; pointer-events: none; text-shadow: 0 2px 8px #0e1520; }
+.twin2d-caption strong { color: #edf4f8; font-family: Manrope, sans-serif; font-size: 12px; }
+.twin2d-caption span { color: #9aafbb; font-size: 10px; }
+.twin2d-hint { position: absolute; right: 14px; bottom: 16px; color: #94a4b5; font-size: 10px; pointer-events: none; }
+.physical-svg text, .flow-svg text { font-family: "DM Sans", sans-serif; pointer-events: none; }
+.physical-svg .board-micro { fill: #d1e5e1; font-size: 9px; font-weight: 700; letter-spacing: .05em; }
+.physical-svg .board-logo { fill: #dff1eb; font-family: Manrope, sans-serif; font-size: 28px; font-weight: 800; letter-spacing: .05em; }
+.physical-svg .board-pin { fill: #ffe1a0; font-size: 12px; font-weight: 800; }
+.physical-svg .physical-part, .physical-svg .physical-label, .physical-svg .physical-field { cursor: pointer; }
+.physical-svg .physical-part:focus-visible, .physical-svg .physical-label:focus-visible, .physical-svg .physical-field:focus-visible { outline: 2px solid #ba9afa; }
+.physical-device-title { fill: #c9dce6; font-size: 19px; font-weight: 700; }
+.physical-device-meta, .physical-path-label { fill: #8196a6; font-size: 12px; font-weight: 700; letter-spacing: .04em; }
+.physical-label-title { fill: #e9f1f5; font-size: 16px; font-weight: 700; }
+.physical-label-title.is-active { fill: #c4a7fa; }
+.physical-label-value { fill: #9fb4bf; font-size: 13px; }
+.physical-label-value.fresh { fill: #82d9cf; }
+.physical-label-value.aging { fill: #e2ba73; }
+.physical-label-value.stale { fill: #ac936a; }
+.physical-pin-callout { fill: #e0cc9b; font-size: 12px; font-weight: 700; }
+.physical-field rect { fill: #1d2a38; stroke: #57677c; }
+.physical-field.is-active rect { stroke: #b99cff; stroke-width: 2px; }
+.physical-field text { fill: #dae7ee; font-size: 12px; font-weight: 700; }
+.physical-field .physical-field-value { fill: #95aab8; font-size: 10px; font-weight: 400; }
+.flow-column-label { fill: #8299ad; font-size: 20px; font-weight: 700; }
+.flow-connection .flow-base { fill: none; stroke: #594f7a; stroke-width: 2; opacity: .75; }
+.flow-connection .flow-active { fill: none; stroke: #72cbd7; stroke-width: 2.5; opacity: 0; }
+.flow-connection.fresh .flow-active { opacity: .9; }
+.flow-connection.aging .flow-active { stroke: #d6ac69; opacity: .7; }
+.flow-connection.stale .flow-base { opacity: .4; }
+.flow-connection.unavailable .flow-base { stroke: #586272; opacity: .3; }
+.flow-node { color: #8898aa; }
+.flow-node.is-selectable { cursor: pointer; }
+.flow-node .flow-node-ring { fill: #14202d; stroke: #75639b; stroke-width: 2.5; }
+.flow-node .flow-node-core { fill: #253648; stroke: #5f7790; stroke-width: 1; }
+.flow-node.fresh .flow-node-ring { stroke: #70cad4; }
+.flow-node.aging .flow-node-ring { stroke: #d2a963; }
+.flow-node.stale .flow-node-ring { stroke: #8c755e; }
+.flow-node.unavailable .flow-node-ring { stroke: #5b6875; }
+.flow-node.is-active .flow-node-ring { stroke: #c1a0ff; stroke-width: 4; }
+.flow-node-mark { fill: #e0edf4; font-size: 19px; font-weight: 800; }
+.flow-node-name { fill: #e0edf4; font-size: 19px; font-weight: 700; }
+.flow-node-subtitle { fill: #93a8b8; font-size: 14px; }
 
 .twin-zoom-controls {
   position: absolute;
@@ -205,6 +250,7 @@
   .twin-activity { grid-template-columns: 1fr; }
   .topology-view, .topology-view .twin, .twin-view-frame { min-height: 480px; height: 480px; }
   .topology-note { max-width: calc(100% - 28px); }
+  .twin2d-hint { display: none; }
 }
 
 @media (max-width: 430px) {

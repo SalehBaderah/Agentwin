@@ -11,16 +11,43 @@ export type Reading = {
 export type Event = {
   id: string;
   kind: string;
+  subject: string;
   created: number;
   recovered: number | null;
   acknowledged: number | null;
   severity: string;
+  email_status: "pending" | "sent" | "failed" | "cancelled" | "not_configured";
   evidence: {
     rule: string;
     cause: string;
     readings: Reading[];
     source_mode: string;
+    device_id?: string;
+    field_key?: string;
+    direction?: "above" | "below";
+    limit?: number;
+    unit?: string;
+    close_reason?: string;
   };
+};
+export type ThresholdRule = { field_key: string; direction: "above" | "below"; limit: number };
+export type MonitoringSettings = {
+  silence_seconds: number;
+  threshold_rules: ThresholdRule[];
+  summary_enabled: boolean;
+  summary_interval_minutes: number;
+  alert_email_enabled: boolean;
+  summary_email_enabled: boolean;
+  email_to: string | null;
+};
+export type Summary = {
+  id: string;
+  period_start: number;
+  period_end: number;
+  created: number;
+  body: string;
+  source: "local_model" | "deterministic";
+  email_status: "pending" | "sent" | "failed" | "cancelled" | "not_configured";
 };
 export type Component = {
   id: string;
@@ -60,6 +87,7 @@ export type Project = {
   freshness_seconds: number;
   interval_seconds: number;
   high_limit: number | null;
+  monitoring: MonitoringSettings;
   attenuator_inserted?: boolean;
   cable_description: string;
   mapping: { field: string; unit: string };
@@ -90,6 +118,7 @@ export type State = {
   latest: Reading | null;
   readings: Reading[];
   events: Event[];
+  summaries: Summary[];
   actions: { id: string; created: number; action: string; target: string; status: string }[];
   devices: { id: string; connector: string; online: boolean; reporting: boolean }[];
   field_status: Record<string, { received: number | null; fresh: boolean; device_id?: string | null }>;

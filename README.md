@@ -108,7 +108,9 @@ Stop-Process -Id <PID>
 - Live, simulated and replay histories and latest-state calculations are session-isolated. Replay explicitly selects the currently viewed original recording, keeps original provenance/timestamps and replays at most its latest 180 samples. Replay does not trigger fresh operational events.
 - WebSocket snapshots update the overview and project workspace every second. Reconnect loads the current state via HTTP and resumes snapshots; charts/browser readings are bounded to 180 samples. Missing samples produce chart gaps.
 - Device/project/topic validation, strict versioned schema, finite/range/type checks, deduplication, retired-boot rejection, retained-message rejection, server receipt timestamps and connector-derived source metadata.
-- Deterministic missing-telemetry and high-limit rules with three-sample level debounce, a ten-second recurrence cooldown and explicit recovery. Acknowledgement is a separate operator action.
+- Deterministic per-device silence alerts after the first accepted sample, plus optional numeric above/below limits requiring two recent readings. Alerts close when telemetry resumes or readings return to range; acknowledgement is a separate operator action.
+- Project-scoped live summaries at a configurable 1-1,440-minute interval, visible in Win and Events, with optional branded email. Email includes the last stored live telemetry age at the window end and its UTC timestamp; no stored reading is reported as unknown, not guessed.
+- Physical 2D, data-flow, and topology Twin views generated from project components, with generic visuals for future project types. This branch does not provide a 3D/WebGL Twin.
 - Local Qwen synthesis through LM Studio with deterministic server-side observation routing, free-text redaction, JSON-schema output and server-attached evidence. The existing OpenAI Responses tool loop remains an optional provider. Provider failures explicitly display **AI agent unavailable** while deterministic monitoring continues.
 - Arduino USB telemetry plus a reconnecting pySerial/Paho gateway with availability reporting and live-only LED command forwarding. Requested actions remain separate from telemetry-confirmed completion.
 
@@ -137,13 +139,21 @@ API explorer: http://127.0.0.1:8000/docs. Project/session IDs in routes select t
 
 ### AI security and evidence
 
-Device labels, descriptions, notes and stored conversation content are data, not trusted instructions. The local controller chooses and executes bounded operations before inference, removes arbitrary prose fields, exposes no tools to Qwen, and attaches reading/event evidence from returned records rather than model text. Event references are checked within project/session before proposals. No calls occur per sensor sample; user questions invoke the provider. The optional OpenAI provider retains its bounded four-turn/eight-tool-call loop.
+Device labels, descriptions, notes and stored conversation content are data, not trusted instructions. The local controller chooses and executes bounded operations before inference, removes arbitrary prose fields, exposes no tools to Qwen, and attaches reading/event evidence from returned records rather than model text. Event references are checked within project/session before proposals. No calls occur per sensor sample; user questions and scheduled summaries may invoke the provider. The optional OpenAI provider retains its bounded four-turn/eight-tool-call loop.
 
 For local Qwen, start LM Studio's localhost server, load the model and copy its identifier from `lms ps` or `GET /v1/models`. With the current model, set `LLM_PROVIDER=lmstudio`, `LLM_MODEL=qwen/qwen3-4b-2507`, and `LLM_BASE_URL=http://127.0.0.1:1234/v1` in `.env`. The server must remain running while Agentwin answers questions. See `.env.example` for the complete local configuration.
 
 To use the optional hosted provider instead, set `OPENAI_API_KEY`, `LLM_PROVIDER=openai` and `LLM_MODEL`. The starting hosted model `gpt-5.6-luna` is documented in the [official model page](https://developers.openai.com/api/docs/models/gpt-5.6-luna); [Responses function calling](https://developers.openai.com/api/docs/guides/function-calling) remains implemented using the installed SDK.
 
 Only server-generated references to stored readings/events render as evidence. They do not guarantee that every model statement is correct; unsupported/invalid references are removed. Missing evidence is disclosed. Monitoring/rules work without any API key or internet. Provider-configured status means configuration exists, not that a request succeeded.
+
+### Live alerts and scheduled Win summaries
+
+Every existing and future project has independent monitoring settings under **Settings → Project monitoring**. The defaults are a 30-second per-device silence alert and a 10-minute live summary; threshold rules are **off** until an operator adds a limit to a numeric field. Silence starts only after that device's first accepted sample. A threshold event requires two recent readings beyond its configured above/below limit and closes after two normal readings. Removing or changing a rule closes its open event as a settings change, not as a claimed physical recovery. Simulation events never send email.
+
+The summary interval accepts any whole number from 1 to 1,440 minutes and can be disabled per project. Each summary is stored, shown in Win's panel and the Events views, and optionally emailed. Its email shows the most recent stored telemetry from the live session as an age measured at the window end plus the UTC receipt time. If none is stored, the email says so. If the local model is unavailable, Agentwin uses a factual deterministic summary; alerts and delivery do not depend on the model. After a backend restart, one current-window summary is created when overdue rather than sending a backlog. The backend must remain running; monitoring its own outage requires an external watchdog.
+
+To send email, set `AGENTWIN_SMTP_HOST`, `AGENTWIN_EMAIL_FROM`, and either `AGENTWIN_EMAIL_TO` or a recipient in the project's settings. Set `AGENTWIN_SMTP_PORT`, `AGENTWIN_SMTP_SECURITY` (`starttls`, `ssl`, or `none`), and SMTP credentials as required by your mail service; see `.env.example`. Keep SMTP secrets only in the ignored local `.env`, never in the UI or a commit. Restart the backend after changing `.env`. Every queued summary is retained for bounded retries; failed delivery is shown as failed, not silently treated as sent. An SMTP configuration indicator only confirms settings are present, not that delivery succeeded. The branded HTML email embeds the Agentwin mark and includes a plain-text version; delivery requires a reachable mail service.
 
 ### Operational-agent evaluation
 
@@ -168,6 +178,8 @@ The two device identities and telemetry fields are configured per project in the
 npm.cmd --prefix frontend run lint
 npm.cmd --prefix frontend run typecheck
 npm.cmd --prefix frontend run build
+node frontend/tests/twin-state.mjs
+node frontend/tests/project-actions-layout.mjs
 # With backend running on 8000 and Microsoft Edge installed:
 npm.cmd --prefix frontend run smoke
 # CLI simulation controls:

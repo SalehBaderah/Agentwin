@@ -32,6 +32,8 @@ export type TwinComponentState = {
   label: string;
   deviceId?: string;
   pin?: string;
+  transport?: string;
+  visualKey: string;
   configured: {
     relationships: string[];
     values: Record<string, unknown>;
@@ -46,6 +48,7 @@ export type TwinComponentState = {
     reporting: boolean;
     freshness: TwinFreshness;
     ageMs?: number;
+    transportAvailable?: boolean;
   };
   evidence: {
     level: TwinEvidenceLevel;
@@ -75,6 +78,8 @@ export type TwinLayoutNode = TwinComponentState & {
 
 export type TwinState = {
   source: State;
+  project: { id: string; name: string; mode: string };
+  devices: { id: string; connector: string; freshness: TwinFreshness; reporting: boolean }[];
   components: TwinComponentState[];
   edges: TwinEdgeState[];
   layout: TwinLayoutNode[];

@@ -1,5 +1,7 @@
 import asyncio, json, logging, math, os, time
 from paho.mqtt import client as mqtt
+from .agent import scheduled_summary
+from .notifications import send_email, smtp_configured
 from .store import uid
 
 log = logging.getLogger(__name__)
@@ -15,7 +17,9 @@ def sample(project, boot, sequence, elapsed, scenario='normal'):
     return {'schema_version': 1, 'project_id': project['id'], 'device_id': project['device_id'], 'boot_id': boot, 'sequence': sequence, 'uptime_ms': int(elapsed * 1000), 'session_registration': True, 'readings': readings}
 
 class Runtime:
-    def __init__(self, store): self.store, self.tasks, self.mqtt_connected, self.rejections, self.client = store, {}, False, 0, None
+    def __init__(self, store):
+        self.store, self.tasks, self.mqtt_connected, self.rejections, self.client = store, {}, False, 0, None
+        self.summary_tasks, self.email_task = {}, None
     def start_mqtt(self):
         self.client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id='agentwin-backend-' + uid()[:8], clean_session=True)
         if os.getenv('MQTT_USERNAME'): self.client.username_pw_set(os.getenv('MQTT_USERNAME'), os.getenv('MQTT_PASSWORD'))
@@ -77,8 +81,33 @@ class Runtime:
                 for mode in ('live', 'simulated'):
                     try: self.store.evaluate(project['id'], self.store.session(project['id'], mode=mode)['id'])
                     except ValueError: pass
+            for pid, sid, slot in self.store.due_summaries():
+                task = self.summary_tasks.get(pid)
+                if task is None or task.done():
+                    self.summary_tasks[pid] = asyncio.create_task(self.generate_summary(pid, sid, slot))
+            if smtp_configured() and (self.email_task is None or self.email_task.done()):
+                self.email_task = asyncio.create_task(self.deliver_email())
             await asyncio.sleep(1)
+
+    async def generate_summary(self, pid, sid, slot):
+        try:
+            facts = self.store.summary_facts(pid, sid)
+            body, source = await scheduled_summary(facts)
+            self.store.save_summary(pid, sid, slot, facts, body, source)
+        except Exception:
+            log.exception('Scheduled summary failed for project=%s', pid)
+
+    async def deliver_email(self):
+        for item in self.store.pending_email():
+            try:
+                await asyncio.to_thread(send_email, item)
+                self.store.email_result(item['id'])
+            except Exception as error:
+                log.warning('Email delivery failed for project=%s ref=%s', item['project'], item['ref_id'])
+                self.store.email_result(item['id'], error)
+
     async def close(self):
-        for task in self.tasks.values(): task.cancel()
-        await asyncio.gather(*self.tasks.values(), return_exceptions=True)
+        background = [*self.tasks.values(), *self.summary_tasks.values(), *([self.email_task] if self.email_task else [])]
+        for task in background: task.cancel()
+        await asyncio.gather(*background, return_exceptions=True)
         if self.client: self.client.disconnect(); self.client.loop_stop()

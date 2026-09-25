@@ -33,9 +33,12 @@ export function TwinInspector({ component, state, refresh, open, onClose }: { co
       {component.observed.metrics.length ? component.observed.metrics.map((metric) => <div className="inspector-metric" key={metric.key}><span>{metric.label}<small>{metric.key} · {metric.source}</small></span><strong>{metricValue(metric.value, metric.precision)} {metric.value !== null && metric.value !== undefined ? metric.unit : ""}<small>{metric.isLastKnown ? "Last known · " : ""}{metric.freshness} · {age(metric.ageMs)}</small></strong></div>) : <p className="detail-empty">Configured component with no bound live readings.</p>}
       {component.deviceId && <div className="detail-relation"><span>Device</span><strong>{component.deviceId}</strong></div>}
       {component.pin && <div className="detail-relation"><span>Pin</span><strong>{component.pin}</strong></div>}
+      {component.transport && <div className="detail-relation"><span>Transport</span><strong>{component.transport.toUpperCase()}</strong></div>}
+      {component.health.transportAvailable !== undefined && <div className="detail-relation"><span>Gateway availability</span><strong>{component.health.transportAvailable ? "Connected" : "Unavailable"}</strong></div>}
       {component.observed.bootId && <div className="detail-relation"><span>Boot session</span><strong>{component.observed.bootId}</strong></div>}
       {component.observed.sequence !== undefined && <div className="detail-relation"><span>Sequence</span><strong>#{component.observed.sequence}</strong></div>}
       {component.observed.receivedAt && <div className="detail-relation"><span>Last received</span><strong>{time(component.observed.receivedAt)}</strong></div>}
+      <div className="detail-relation"><span>Freshness</span><strong>{component.health.freshness} · {age(component.health.ageMs)}</strong></div>
     </div></details>
     <details open><summary>Evidence</summary><div className="inspector-content evidence-list">
       <p><Check size={14}/><span><strong>Configured</strong>{component.pin ? `${component.label} bound to ${component.pin}.` : `${component.label} exists in project configuration.`}</span></p>

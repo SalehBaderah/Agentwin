@@ -36,6 +36,27 @@ class ComponentCreate(Strict):
     precision: int = Field(default=2, ge=0, le=8)
     freshness_seconds: int | None = Field(default=None, ge=3, le=3600)
 
+class ThresholdRule(Strict):
+    field_key: str = Field(pattern=r'^[a-z][a-z0-9_]{0,39}$')
+    direction: Literal['above', 'below']
+    limit: float
+
+class MonitoringSettings(Strict):
+    silence_seconds: int = Field(default=30, ge=3, le=86400)
+    threshold_rules: list[ThresholdRule] = Field(default_factory=list, max_length=32)
+    summary_enabled: bool = True
+    summary_interval_minutes: int = Field(default=10, ge=1, le=1440)
+    alert_email_enabled: bool = True
+    summary_email_enabled: bool = True
+    email_to: str | None = Field(default=None, max_length=254, pattern=r'^[^@\s,<>]+@[^@\s,<>]+\.[^@\s,<>]+$')
+
+    @model_validator(mode='after')
+    def distinct_rules(self):
+        keys = [(rule.field_key, rule.direction) for rule in self.threshold_rules]
+        if len(keys) != len(set(keys)):
+            raise ValueError('Threshold rules must have unique field and direction')
+        return self
+
 class ProjectCreate(Strict):
     name: str = Field(min_length=1, max_length=100)
     template: Literal['led', 'temperature', 'water', 'connectivity', 'generic'] = 'generic'
@@ -50,6 +71,7 @@ class ProjectCreate(Strict):
     devices: list[DeviceCreate] = Field(default_factory=list, max_length=16)
     components: list[ComponentCreate] = Field(default_factory=list, max_length=64)
     retention_days: int = Field(default=30, ge=1, le=3650)
+    monitoring: MonitoringSettings = Field(default_factory=MonitoringSettings)
     @model_validator(mode='after')
     def intervals(self):
         if self.freshness_seconds < self.interval_seconds * 2: raise ValueError('Freshness must be at least twice the sampling interval')
@@ -81,3 +103,4 @@ class Settings(Strict):
     freshness_seconds: int = Field(ge=3, le=3600)
     high_limit: float | None = None
     cable_description: str = Field(max_length=300)
+    monitoring: MonitoringSettings | None = None

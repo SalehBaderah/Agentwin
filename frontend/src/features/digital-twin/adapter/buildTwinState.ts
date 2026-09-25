@@ -26,7 +26,8 @@ function freshness(ageMs: number | undefined, limitSeconds: number): TwinFreshne
   if (ageMs === undefined) return "unavailable";
   if (ageMs <= limitSeconds * 650) return "fresh";
   if (ageMs <= limitSeconds * 1000) return "aging";
-  return "stale";
+  if (ageMs <= limitSeconds * 3000) return "stale";
+  return "unavailable";
 }
 
 function readingFor(readings: Reading[], field: string, deviceId?: string | null) {
@@ -94,6 +95,7 @@ export function buildTwinState(state: State, nowMs: number): TwinState {
   };
   const fields = Object.entries(state.project.graph.fields);
   const components: TwinComponentState[] = state.project.graph.components.map((component) => {
+    const role = componentType(component);
     const componentFields = fields.filter(([, metric]) => metric.component_id === component.id);
     const metrics = componentFields
       .filter(([key]) => !key.includes("command_id"))
@@ -111,23 +113,31 @@ export function buildTwinState(state: State, nowMs: number): TwinState {
           receivedAt: reading?.received,
           ageMs,
           freshness: metricFreshness,
-          isLastKnown: metricFreshness === "stale",
+          isLastKnown: Boolean(reading && (metricFreshness === "stale" || metricFreshness === "unavailable")),
         };
       });
     const latestMetric = metrics.reduce<(typeof metrics)[number] | undefined>((latest, metric) =>
       !latest || (metric.receivedAt || 0) > (latest.receivedAt || 0) ? metric : latest, undefined);
     const deviceId = String(component.configuration.device_id || componentFields[0]?.[1].device_id || "") || undefined;
+    const deviceReading = deviceId ? readings.filter((item) => item.device === deviceId).at(-1) : undefined;
+    const reportsDevice = role === "controller" || role === "gateway" || role === "transport";
     const relatedEvents = state.events.filter((event) =>
       event.evidence.readings.some((reading) => componentFields.some(([key]) => Object.hasOwn(reading.readings, key))),
     );
-    const componentFreshness = metrics.length ? worstFreshness(metrics.map((metric) => metric.freshness)) : deviceId ? deviceFreshness(deviceId) : "unavailable";
-    const reported = metrics.some((metric) => metric.receivedAt !== undefined);
+    const componentFreshness = metrics.length ? worstFreshness(metrics.map((metric) => metric.freshness)) : reportsDevice && deviceId ? deviceFreshness(deviceId) : "unavailable";
+    const reported = metrics.some((metric) => metric.receivedAt !== undefined) || Boolean(reportsDevice && deviceReading);
+    const device = state.project.devices.find((item) => item.id === deviceId);
+    const declaredVisual = component.visual?.model || component.configuration.board || component.configuration.model;
+    const boardHint = `${state.project.name} ${deviceId || ""}`.toLowerCase();
+    const visualKey = String(declaredVisual || (role === "controller" && /\br4\b|[_-]r4(?:[_-]|$)/.test(boardHint) ? "uno-r4" : role === "controller" && /arduino[_\s-]*uno|\buno[_\s-]/.test(boardHint) ? "arduino-uno" : component.type)).toLowerCase();
     return {
       id: component.id,
-      type: componentType(component),
+      type: role,
       source: component,
       label: component.name || component.label,
       deviceId,
+      transport: device?.connector || (typeof component.configuration.connector === "string" ? component.configuration.connector : undefined),
+      visualKey,
       pin: typeof component.configuration.pin === "string" ? component.configuration.pin : undefined,
       configured: {
         relationships: state.project.graph.edges.filter((edge) => edge.source === component.id || edge.target === component.id).map((edge) => edge.id),
@@ -135,14 +145,15 @@ export function buildTwinState(state: State, nowMs: number): TwinState {
       },
       observed: {
         metrics,
-        receivedAt: latestMetric?.receivedAt,
-        bootId: latestMetric ? readingFor(readings, latestMetric.key, deviceId)?.boot : undefined,
-        sequence: latestMetric ? readingFor(readings, latestMetric.key, deviceId)?.seq : undefined,
+        receivedAt: latestMetric?.receivedAt || (reportsDevice ? deviceReading?.received : undefined),
+        bootId: latestMetric ? readingFor(readings, latestMetric.key, deviceId)?.boot : reportsDevice ? deviceReading?.boot : undefined,
+        sequence: latestMetric ? readingFor(readings, latestMetric.key, deviceId)?.seq : reportsDevice ? deviceReading?.seq : undefined,
       },
       health: {
         reporting: componentFreshness === "fresh" || componentFreshness === "aging",
         freshness: componentFreshness,
-        ageMs: latestMetric?.ageMs,
+        ageMs: latestMetric?.ageMs ?? (reportsDevice && deviceReading ? Math.max(0, nowMs - deviceReading.received * 1000) : undefined),
+        transportAvailable: role === "gateway" || role === "transport" ? state.devices.find((item) => item.id === deviceId)?.online : undefined,
       },
       evidence: {
         level: reported ? "reported" : "configured",
@@ -159,14 +170,12 @@ export function buildTwinState(state: State, nowMs: number): TwinState {
     const target = byId.get(edge.target);
     const pending = source?.actions.some((action) => action.status === "requested") || target?.actions.some((action) => action.status === "requested");
     const edgeFreshness = worstFreshness([source?.health.freshness || "unavailable", target?.health.freshness || "unavailable"]);
-    const deviceReporting = Boolean(source?.health.reporting || target?.health.reporting);
+    const recentData = edge.category === "data" && source?.health.freshness === "fresh" && target?.health.freshness === "fresh";
     return {
       ...edge,
-      activity: pending && edge.category === "control"
-        ? "command" as const
-        : edge.category === "data" && (edgeFreshness !== "unavailable" || deviceReporting)
-          ? edgeFreshness === "unavailable" ? "fresh" as const : edgeFreshness
-          : "configured" as const,
+      activity: pending && edge.category === "control" ? "command" as const
+        : edge.category === "data" ? recentData ? "fresh" as const : edgeFreshness
+        : "configured" as const,
     };
   });
   const latest = readings.at(-1);
@@ -176,6 +185,8 @@ export function buildTwinState(state: State, nowMs: number): TwinState {
   const mode = state.session.mode.toLowerCase();
   return {
     source: state,
+    project: { id: state.project.id, name: state.project.name, mode: state.session.mode },
+    devices: state.project.devices.map((device) => ({ id: device.id, connector: device.connector, freshness: deviceFreshness(device.id), reporting: ["fresh", "aging"].includes(deviceFreshness(device.id)) })),
     components,
     edges,
     layout: positioned.nodes,

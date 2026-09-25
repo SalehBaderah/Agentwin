@@ -96,10 +96,10 @@ def test_missing_telemetry_starts_only_after_first_report(store):
     assert store.events(project['id'], sid) == []
     observed = time.time()+31
     assert store.ingest(packet(project, readings={'led_on':False,'last_command_id':None}), sid, now=observed)['accepted']
-    store.evaluate(project['id'], sid, now=observed+project['freshness_seconds']+1)
+    store.evaluate(project['id'], sid, now=observed+project['monitoring']['silence_seconds']+1)
     events = store.events(project['id'], sid)
     assert len(events) == 1 and events[0]['recovered'] is None
-    assert store.ingest(packet(project, 1, readings={'led_on':False,'last_command_id':None}), sid, now=observed+project['freshness_seconds']+2)['accepted']
+    assert store.ingest(packet(project, 1, readings={'led_on':False,'last_command_id':None}), sid, now=observed+project['monitoring']['silence_seconds']+2)['accepted']
     assert store.events(project['id'], sid)[0]['recovered'] is not None
 
 def test_http_onboarding_and_project_sessions(tmp_path):

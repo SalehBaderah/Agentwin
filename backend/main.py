@@ -1,4 +1,4 @@
-import asyncio, json, os
+import asyncio, os
 from contextlib import asynccontextmanager
 from pathlib import Path
 from dotenv import load_dotenv
@@ -9,8 +9,8 @@ from fastapi.staticfiles import StaticFiles
 from .models import ComponentAction, DeviceCreate, ProjectCreate, Question, Scenario, SessionCreate, Settings
 from .store import Store
 from .runtime import Runtime
-from .templates import definition
 from .agent import answer, provider_available, provider_configured
+from .notifications import smtp_configured
 
 load_dotenv()
 def create_app(path=None, background=True):
@@ -32,7 +32,7 @@ def create_app(path=None, background=True):
     @app.get('/api/health')
     async def health():
         configured = provider_configured()
-        return {'status': 'ready', 'mqtt': runtime.mqtt_connected, 'mqtt_rejections': runtime.rejections, 'agent_configured': configured, 'agent_available': await provider_available() if configured else False, 'agent_provider': os.getenv('LLM_PROVIDER', 'openai')}
+        return {'status': 'ready', 'mqtt': runtime.mqtt_connected, 'mqtt_rejections': runtime.rejections, 'agent_configured': configured, 'agent_available': await provider_available() if configured else False, 'agent_provider': os.getenv('LLM_PROVIDER', 'openai'), 'email_configured': smtp_configured(), 'email_default_recipient_configured': bool(os.getenv('AGENTWIN_EMAIL_TO'))}
     @app.get('/api/projects')
     def projects(): return [store.state(project['id']) for project in store.projects()]
     @app.post('/api/projects', status_code=201)
@@ -65,7 +65,7 @@ def create_app(path=None, background=True):
     async def agent(pid: str, sid: str, body: Question): return await answer(store, pid, sid, body.question, component_id=body.component_id)
     @app.put('/api/projects/{pid}/settings')
     def settings(pid: str, body: Settings):
-        project = store.project(pid); project.update(body.model_dump()); project['graph'] = definition(project['template'], project['mapping'], cable=project['cable_description'], device_id=project['device_id'], connector=project['connector'], devices=project['devices'], components=project.get('components') or None, freshness_seconds=project['freshness_seconds']); store.execute('UPDATE projects SET config=? WHERE id=?', (json.dumps(project), pid)); return project
+        return store.update_settings(pid, body)
     @app.websocket('/api/ws')
     async def websocket(ws: WebSocket):
         await ws.accept()
