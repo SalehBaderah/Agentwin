@@ -84,6 +84,7 @@
   --color-danger-subtle: var(--danger-subtle);
   --color-danger-border: var(--danger-border);
   --color-info: var(--info);
+  --color-surface-elevated: var(--surface-elevated);
   --color-glass: var(--glass);
   --color-backdrop: var(--backdrop);
   --radius-sm: calc(var(--radius-control) - 4px);

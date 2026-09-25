@@ -146,8 +146,6 @@ option {
   color: var(--text-primary);
   flex-shrink: 0;
 }
-.brand-mark-physical { fill: currentColor; }
-.brand-mark-digital { fill: #7c3aed; }
 .version {
   font-size: 9px;
   background: var(--surface-hover);
@@ -1909,7 +1907,6 @@ p,
 .win-summary-heading,
 .win-summary-footer { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .win-summary-brand { display: inline-flex; align-items: center; gap: 6px; }
-.win-summary-brand .brand-mark { width: 20px; height: 20px; }
 .win-summary-heading strong { font-size: 12px; }
 .win-summary-heading span,
 .win-summary time,

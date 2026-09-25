@@ -44,7 +44,7 @@ export function AgentPanel({ state, onCollapse }: { state: State; onCollapse?: (
       <small><i className={`win-status-dot ${state.status === "reporting" ? "is-reporting" : ""}`}/>{sessionLabel(state.session.mode)} session <span aria-hidden="true">·</span> {state.status}</small>
     </div>
     <section className="win-summary" aria-label="Latest scheduled summary">
-      <div className="win-summary-heading"><div className="win-summary-brand"><Mark/><strong>Agentwin summary</strong></div><span>{state.project.monitoring.summary_interval_minutes} min</span></div>
+      <div className="win-summary-heading"><div className="win-summary-brand"><Mark className="size-5"/><strong>Agentwin summary</strong></div><span>{state.project.monitoring.summary_interval_minutes} min</span></div>
       {latestSummary ? <><time dateTime={new Date(latestSummary.period_end * 1000).toISOString()}>{summaryTime(latestSummary.period_end)}</time><p>{latestSummary.body}</p><div className="win-summary-footer"><span>{latestSummary.source === "local_model" ? "AI-assisted" : "Evidence summary"} · Email {emailStatus(latestSummary.email_status, state.project.monitoring.summary_email_enabled)}</span><Link to="/events">View in Events</Link></div></> : <p className="win-summary-pending">{state.project.monitoring.summary_enabled ? "The first live summary will appear after the next interval." : "Summaries are off for this project."}</p>}
     </section>
     <div className="win-suggestions">

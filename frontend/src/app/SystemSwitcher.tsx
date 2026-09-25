@@ -67,7 +67,7 @@ export function SystemSwitcher({
   };
   return <div className="system-switcher">
     <button ref={trigger} className="system-switcher-trigger" type="button" onClick={onToggle} onKeyDown={(event) => { if (event.key === "ArrowDown") { event.preventDefault(); if (!open) onToggle(); } }} aria-haspopup="menu" aria-expanded={open}>
-      <span className="system-switcher-mark"><Mark/></span>
+      <span className="system-switcher-mark"><Mark className="size-[22px]"/></span>
       <span>{selected?.project.name || "All Systems"}</span>
       <ChevronRight size={14}/>
     </button>
