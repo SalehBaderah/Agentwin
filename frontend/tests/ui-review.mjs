@@ -157,7 +157,7 @@ try {
   await page.emulateMedia({ reducedMotion: "reduce" });
   expect(
     await page
-      .locator(".sidebar")
+      .locator(".app-shell")
       .evaluate((e) => getComputedStyle(e).transitionDuration),
   ).toBe("0s");
   checks.push("Reduced motion disables surface transitions");

@@ -1,100 +1,64 @@
-import type { State } from "@/types";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Check, ChevronRight, LayoutDashboard, Plus, Search } from "lucide-react";
+import { ChevronsUpDown, LayoutDashboard, Plus, Search } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Mark } from "@/components/Mark";
-import { useDropdownClass } from "@/app/useDropdownClass";
+import { cn } from "@/lib/utils";
+import type { State } from "@/types";
 
-export function SystemSwitcher({
-  open,
-  onToggle,
-  onClose,
-  states,
-  selectedProjectId,
-}: {
-  open: boolean;
-  onToggle: () => void;
-  onClose: () => void;
-  states: State[];
-  selectedProjectId: string | null;
-}) {
+const projectState = (state: State) =>
+  state.devices.some((device) => device.reporting) ? { label: "Live", dot: "bg-success" } : state.latest ? { label: "Stale", dot: "bg-warning" } : { label: "Unavailable", dot: "bg-muted-foreground" };
+
+export function SystemSwitcher({ states, selectedProjectId }: { states: State[]; selectedProjectId: string | null }) {
   const [query, setQuery] = useState("");
-  const trigger = useRef<HTMLButtonElement>(null);
-  const search = useRef<HTMLInputElement>(null);
-  const options = useRef<(HTMLButtonElement | null)[]>([]);
   const navigate = useNavigate();
-  const dropdownClass = useDropdownClass(open);
   const selected = states.find((state) => state.project.id === selectedProjectId);
   const searchable = states.length > 7;
   const projects = useMemo(() => {
     const value = query.trim().toLowerCase();
     return value ? states.filter((state) => `${state.project.name} ${state.project.id} ${state.devices.map((device) => device.id).join(" ")}`.toLowerCase().includes(value)) : states;
   }, [query, states]);
-  const selectedOptionIndex = selectedProjectId ? Math.max(1, states.findIndex((state) => state.project.id === selectedProjectId) + 1) : 0;
-  useEffect(() => {
-    if (!open) return;
-    setQuery("");
-    requestAnimationFrame(() => {
-      if (searchable) search.current?.focus();
-      else options.current[selectedOptionIndex]?.focus();
-    });
-  }, [open, searchable, selectedOptionIndex]);
-  const choose = (path: string) => {
-    navigate(path);
-    onClose();
-    requestAnimationFrame(() => trigger.current?.focus());
-  };
-  const moveFocus = (event: React.KeyboardEvent, direction: 1 | -1) => {
-    event.preventDefault();
-    const available = options.current.filter((option): option is HTMLButtonElement => Boolean(option));
-    if (!available.length) return;
-    const current = available.indexOf(document.activeElement as HTMLButtonElement);
-    available[(current + direction + available.length) % available.length]?.focus();
-  };
-  const onMenuKeyDown = (event: React.KeyboardEvent) => {
-    if (event.key === "ArrowDown") moveFocus(event, 1);
-    if (event.key === "ArrowUp") moveFocus(event, -1);
-    if (event.key === "Escape") {
-      event.preventDefault();
-      onClose();
-      trigger.current?.focus();
-    }
-  };
-  const projectState = (state: State) => {
-    if (state.devices.some((device) => device.reporting)) return { label: "Live", tone: "live" };
-    if (state.latest) return { label: "Stale", tone: "stale" };
-    return { label: "Unavailable", tone: "unavailable" };
-  };
-  return <div className="system-switcher">
-    <button ref={trigger} className="system-switcher-trigger" type="button" onClick={onToggle} onKeyDown={(event) => { if (event.key === "ArrowDown") { event.preventDefault(); if (!open) onToggle(); } }} aria-haspopup="menu" aria-expanded={open}>
-      <span className="system-switcher-mark"><Mark className="size-[22px]"/></span>
-      <span>{selected?.project.name || "All Systems"}</span>
-      <ChevronRight size={14}/>
-    </button>
-    {(open || dropdownClass === "is-closing") && (
-      <button className="topbar-popover-dismiss" type="button" aria-label="Close system switcher" onClick={onClose}/>
-    )}
-    <section className={`t-dropdown topbar-popover system-switcher-menu ${dropdownClass}`} data-origin="top-left" role="menu" aria-label="System and project navigation" aria-hidden={!open} inert={!open ? true : undefined} onKeyDown={onMenuKeyDown}>
-      {searchable && <label className="system-switcher-search"><Search size={15}/><input ref={search} value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "ArrowDown") moveFocus(event, 1); }} placeholder="Find a project" aria-label="Find a project"/></label>}
-      <span className="switcher-group-label">All systems</span>
-      <button ref={(element) => { options.current[0] = element; }} className={`system-switcher-option ${!selectedProjectId ? "selected" : ""}`} type="button" role="menuitemradio" aria-checked={!selectedProjectId} onClick={() => choose("/")}>
-        <span className="switcher-option-icon"><LayoutDashboard size={15}/></span>
-        <span><strong>All Systems</strong><small>{states.length} configured {states.length === 1 ? "project" : "projects"}</small></span>
-        {!selectedProjectId && <Check size={15}/>}
-      </button>
-      <span className="switcher-group-label">Projects</span>
-      <div className="system-switcher-projects">
-        {projects.length ? projects.map((state, index) => {
-          const status = projectState(state);
-          const isSelected = state.project.id === selectedProjectId;
-          return <button key={state.project.id} ref={(element) => { options.current[index + 1] = element; }} className={`system-switcher-option ${isSelected ? "selected" : ""}`} type="button" role="menuitemradio" aria-checked={isSelected} onClick={() => choose(`/projects/${state.project.id}`)}>
-            <span className={`switcher-status ${status.tone}`}/>
-            <span><strong>{state.project.name}</strong><small>{status.label} · {state.devices.length} {state.devices.length === 1 ? "device" : "devices"}</small></span>
-            {isSelected && <Check size={15}/>}
-          </button>;
-        }) : <p className="switcher-empty">No projects match “{query}”.</p>}
-      </div>
-      <Link className="system-switcher-add" to="/projects/new" onClick={onClose}><Plus size={15}/>Add project</Link>
-    </section>
-  </div>;
+  return (
+    <DropdownMenu onOpenChange={(open) => { if (open) setQuery(""); }}>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" className="h-10 min-w-0 shrink gap-2 rounded-[11px] pr-2.5 pl-2 text-[13px] font-semibold">
+          <Mark className="size-[22px]" />
+          <span className="max-w-48 truncate">{selected?.project.name || "All Systems"}</span>
+          <ChevronsUpDown className="text-muted-foreground" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-72" aria-label="System and project navigation">
+        {searchable && (
+          <div className="relative p-1">
+            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => event.stopPropagation()} placeholder="Find a project" aria-label="Find a project" className="h-8 pl-8" />
+          </div>
+        )}
+        <DropdownMenuRadioGroup value={selectedProjectId ?? "all"} onValueChange={(next) => navigate(next === "all" ? "/" : `/projects/${next}`)}>
+          <DropdownMenuLabel className="text-xs text-muted-foreground">All systems</DropdownMenuLabel>
+          <DropdownMenuRadioItem value="all" className="gap-2">
+            <LayoutDashboard />
+            <span className="flex flex-col"><strong className="font-medium">All Systems</strong><small className="text-muted-foreground">{states.length} configured {states.length === 1 ? "project" : "projects"}</small></span>
+          </DropdownMenuRadioItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuLabel className="text-xs text-muted-foreground">Projects</DropdownMenuLabel>
+          <div className="max-h-72 overflow-y-auto">
+            {projects.length ? projects.map((state) => {
+              const status = projectState(state);
+              return (
+                <DropdownMenuRadioItem key={state.project.id} value={state.project.id} className="gap-2">
+                  <span className={cn("size-2 shrink-0 rounded-full", status.dot)} />
+                  <span className="flex min-w-0 flex-col"><strong className="truncate font-medium">{state.project.name}</strong><small className="text-muted-foreground">{status.label} · {state.devices.length} {state.devices.length === 1 ? "device" : "devices"}</small></span>
+                </DropdownMenuRadioItem>
+              );
+            }) : <p className="px-2 py-3 text-sm text-muted-foreground">No projects match “{query}”.</p>}
+          </div>
+        </DropdownMenuRadioGroup>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem asChild><Link to="/projects/new"><Plus />Add project</Link></DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 }

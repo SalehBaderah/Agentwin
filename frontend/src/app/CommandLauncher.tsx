@@ -1,92 +1,55 @@
-import type { State } from "@/types";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Bell, ChevronRight, Layers, Radio, Search, Settings as SettingsIcon } from "lucide-react";
-import type { CommandItem } from "@/app/types";
-import { useDropdownClass } from "@/app/useDropdownClass";
+import { Bell, Layers, Radio, Search, Settings as SettingsIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Command, CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import type { State } from "@/types";
+import type { CommandItem as LauncherItem } from "./types";
 
-export function CommandLauncher({
-  open,
-  onOpen,
-  onClose,
-  states,
-}: {
-  open: boolean;
-  onOpen: () => void;
-  onClose: () => void;
-  states: State[];
-}) {
-  const [query, setQuery] = useState("");
-  const input = useRef<HTMLInputElement>(null);
+const groups = [
+  { kind: "project", heading: "Projects", Icon: Layers },
+  { kind: "device", heading: "Devices", Icon: Radio },
+  { kind: "event", heading: "Events", Icon: Bell },
+  { kind: "settings", heading: "Settings", Icon: SettingsIcon },
+] as const;
+
+export function CommandLauncher({ open, onOpenChange, states }: { open: boolean; onOpenChange: (open: boolean) => void; states: State[] }) {
   const navigate = useNavigate();
-  const dropdownClass = useDropdownClass(open);
-  const items = useMemo<CommandItem[]>(() => {
-    const projects = states.map((state) => ({
-      id: `project-${state.project.id}`,
-      label: state.project.name,
-      meta: "Project",
-      path: `/projects/${state.project.id}`,
-      kind: "project" as const,
-    }));
-    const devices = states.flatMap((state) =>
-      state.devices.map((device) => ({
-        id: `device-${state.project.id}-${device.id}`,
-        label: device.id,
-        meta: `Device in ${state.project.name}`,
-        path: `/projects/${state.project.id}`,
-        kind: "device" as const,
-      })),
-    );
-    const events = states.flatMap((state) =>
-      state.events.map((event) => ({
-        id: `event-${state.project.id}-${event.id}`,
-        label: event.kind.replaceAll("_", " ").replace(/^./, (letter) => letter.toUpperCase()),
-        meta: `${event.recovered ? "Recovered" : "Open"} event in ${state.project.name}`,
-        path: "/events",
-        kind: "event" as const,
-      })),
-    );
-    return [
-      ...projects,
-      ...devices,
-      ...events,
-      { id: "settings", label: "Settings", meta: "Appearance and service availability", path: "/settings", kind: "settings" },
-    ];
-  }, [states]);
-  const results = useMemo(() => {
-    const value = query.trim().toLowerCase();
-    if (!value) return items.filter((item) => item.kind === "project" || item.kind === "settings").slice(0, 7);
-    return items.filter((item) => `${item.label} ${item.meta} ${item.kind}`.toLowerCase().includes(value)).slice(0, 10);
-  }, [items, query]);
-  useEffect(() => {
-    if (!open) return;
-    setQuery("");
-    requestAnimationFrame(() => input.current?.focus());
-  }, [open]);
-  const choose = (path: string) => {
-    navigate(path);
-    onClose();
-  };
+  const items = useMemo<LauncherItem[]>(() => [
+    ...states.map((state) => ({ id: `project-${state.project.id}`, label: state.project.name, meta: "Project", path: `/projects/${state.project.id}`, kind: "project" as const })),
+    ...states.flatMap((state) => state.devices.map((device) => ({ id: `device-${state.project.id}-${device.id}`, label: device.id, meta: `Device in ${state.project.name}`, path: `/projects/${state.project.id}`, kind: "device" as const }))),
+    ...states.flatMap((state) => state.events.map((event) => ({ id: `event-${state.project.id}-${event.id}`, label: event.kind.replaceAll("_", " ").replace(/^./, (letter) => letter.toUpperCase()), meta: `${event.recovered ? "Recovered" : "Open"} event in ${state.project.name}`, path: "/events", kind: "event" as const }))),
+    { id: "settings", label: "Settings", meta: "Appearance and service availability", path: "/settings", kind: "settings" },
+  ], [states]);
+  const choose = (path: string) => { navigate(path); onOpenChange(false); };
   return (
-    <div className="topbar-search-wrap">
-      <button className="topbar-search-trigger" type="button" onClick={onOpen} aria-haspopup="dialog" aria-expanded={open}>
-        <Search size={16} /><span>Search</span><kbd>Ctrl K</kbd>
-      </button>
-      {(open || dropdownClass === "is-closing") && <button className="topbar-popover-dismiss" type="button" aria-label="Close command launcher" onClick={onClose} />}
-      <div className="command-launcher-shell">
-        <section className={`t-dropdown command-launcher ${dropdownClass}`} data-origin="top-right" role="dialog" aria-label="Search Agentwin" aria-hidden={!open} inert={!open ? true : undefined}>
-          <label className="command-search"><Search size={18}/><input ref={input} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search projects, devices, events, settings" aria-label="Search projects, devices, events, and settings"/><kbd>Esc</kbd></label>
-          <div className="command-results" role="listbox" aria-label="Search results">
-            {results.length ? results.map((item) => (
-              <button key={item.id} type="button" role="option" aria-selected="false" onClick={() => choose(item.path)}>
-                <span className={`command-kind ${item.kind}`}>{item.kind === "project" ? <Layers size={15}/> : item.kind === "device" ? <Radio size={15}/> : item.kind === "event" ? <Bell size={15}/> : <SettingsIcon size={15}/>}</span>
-                <span><strong>{item.label}</strong><small>{item.meta}</small></span>
-                <ChevronRight size={15}/>
-              </button>
-            )) : <p className="command-empty">No matching projects, devices, events, or settings.</p>}
-          </div>
-        </section>
-      </div>
-    </div>
+    <>
+      <Button type="button" variant="outline" className="topbar-search-trigger h-[37px] gap-[7px] rounded-[10px] bg-glass-strong px-2.5 text-xs font-semibold text-muted-foreground xl:w-44 xl:justify-start" onClick={() => onOpenChange(true)} aria-haspopup="dialog" aria-expanded={open}>
+        <Search />
+        <span className="sr-only xl:not-sr-only">Search</span>
+        <kbd className="ml-auto hidden rounded border bg-muted px-1.5 font-mono text-[10px] xl:inline">Ctrl K</kbd>
+      </Button>
+      <CommandDialog open={open} onOpenChange={onOpenChange} title="Search Agentwin" description="Search projects, devices, events, and settings">
+        <Command>
+          <CommandInput placeholder="Search projects, devices, events, settings" aria-label="Search projects, devices, events, and settings" />
+          <CommandList>
+            <CommandEmpty>No matching projects, devices, events, or settings.</CommandEmpty>
+            {groups.map(({ kind, heading, Icon }) => {
+              const matches = items.filter((item) => item.kind === kind);
+              return matches.length ? (
+                <CommandGroup key={kind} heading={heading}>
+                  {matches.map((item) => (
+                    <CommandItem key={item.id} value={`${item.label} ${item.meta} ${item.id}`} onSelect={() => choose(item.path)}>
+                      <Icon />
+                      <span className="flex min-w-0 flex-col"><span className="truncate">{item.label}</span><span className="truncate text-xs text-muted-foreground">{item.meta}</span></span>
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              ) : null;
+            })}
+          </CommandList>
+        </Command>
+      </CommandDialog>
+    </>
   );
 }
