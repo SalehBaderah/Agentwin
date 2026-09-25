@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { Bell, Clock3, Mail, Plus, Trash2 } from "lucide-react";
-import type { MonitoringSettings as Monitoring, Project, State, ThresholdRule } from "./types";
-import { api } from "./types";
+import type { MonitoringSettings as Monitoring, Project, State, ThresholdRule } from "@/types";
+import { api } from "@/types";
 
 const copy = (settings: Monitoring): Monitoring => ({
   ...settings,

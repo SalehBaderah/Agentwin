@@ -1,0 +1,26 @@
+import type { State } from "@/types";
+import { useState } from "react";
+import { Link } from "react-router-dom";
+import { Activity, ArrowRight } from "lucide-react";
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
+import { display, time } from "@/types";
+import { metricValue, isVisibleMetric } from "@/lib/format";
+
+export function PlatformAnalytics({ states }: { states: State[] }) {
+  const [projectId, setProjectId] = useState(states[0]?.project.id || "");
+  const [metricKey, setMetricKey] = useState("");
+  const [windowSize, setWindowSize] = useState("30");
+  const selected = states.find((state) => state.project.id === projectId) || states[0];
+  if (!selected) return null;
+  const visibleFields = Object.entries(selected.project.graph.fields).filter(([key]) => isVisibleMetric(key));
+  const field = selected.project.graph.fields[metricKey] && isVisibleMetric(metricKey) ? metricKey : visibleFields[0]?.[0] || selected.project.graph.primary_field;
+  const metric = selected.project.graph.fields[field];
+  const numeric = metric.data_type === "number";
+  const limit = windowSize === "all" ? selected.readings.length : Number(windowSize);
+  const rows = selected.readings.slice(-limit).map((reading) => ({ received: reading.received, value: reading.readings[field] }));
+  const discreteTransitions = rows.filter((row,index,all)=>index===0 || row.value!==all[index-1].value);
+  const reporting = states.flatMap((state) => state.devices).filter((device) => device.reporting).length;
+  const devices = states.flatMap((state) => state.devices).length;
+  const pending = states.flatMap((state) => state.actions).filter((action) => action.status === "requested").length;
+  return <section className="analytics-grid"><div className="panel analytics-primary"><div className="panel-heading"><div><h2>Telemetry history</h2><p>Stored observations only; missing samples remain gaps.</p></div><div className="compact-filters"><label>Project<select value={selected.project.id} onChange={(event) => { setProjectId(event.target.value); setMetricKey(""); }}><option value={selected.project.id}>{selected.project.name}</option>{states.filter((state) => state.project.id !== selected.project.id).map((state) => <option value={state.project.id} key={state.project.id}>{state.project.name}</option>)}</select></label><label>Metric<select value={field} onChange={(event) => setMetricKey(event.target.value)}>{visibleFields.map(([key, item]) => <option value={key} key={key}>{item.label}</option>)}</select></label><label>Window<select value={windowSize} onChange={(event) => setWindowSize(event.target.value)}><option value="30">Latest 30</option><option value="90">Latest 90</option><option value="all">All stored</option></select></label></div></div>{numeric && rows.length ? <div className="overview-chart"><ResponsiveContainer width="100%" height="100%"><LineChart data={rows}><CartesianGrid vertical={false} stroke="var(--border)"/><XAxis dataKey="received" tickFormatter={(value) => time(Number(value))} minTickGap={40}/><YAxis width={48} unit={metric.unit}/><Tooltip labelFormatter={(value) => time(Number(value))} formatter={(value) => [`${display(value)} ${metric.unit}`, metric.label]}/><Line dataKey="value" stroke="var(--chart-line)" isAnimationActive={false} strokeWidth={2} dot={false} connectNulls={false}/></LineChart></ResponsiveContainer></div> : rows.length ? <div className="discrete-history"><div className="discrete-summary"><div><span>Current state</span><strong>{metricValue(rows.at(-1)?.value,metric.precision)}</strong></div><div><span>State changes</span><strong>{Math.max(0,discreteTransitions.length-1)}</strong></div><div><span>Samples in view</span><strong>{rows.length}</strong></div></div><div className="state-track" aria-label={`${metric.label} state history`}>{rows.map((row,index)=><i key={`${row.received}-${index}`} className={row.value===true?"on":row.value===false?"off":"categorical"} title={`${time(row.received)} · ${metricValue(row.value,metric.precision)}`}/>)}</div><div className="state-track-labels"><span>{time(rows[0].received)}</span><span>{time(rows.at(-1)?.received)}</span></div><div className="discrete-changes"><h3>Recent changes</h3>{discreteTransitions.slice().reverse().slice(0,5).map((row,index)=><div key={`${row.received}-${index}`}><span>{time(row.received)}</span><strong>{metricValue(row.value,metric.precision)}</strong></div>)}</div></div> : <div className="chart-empty"><Activity/><strong>No readings yet</strong><p>The visualization appears after the selected project reports telemetry.</p></div>}</div><aside className="panel operations-panel"><div className="panel-heading"><div><h2>Operational status</h2><p>Across configured projects.</p></div></div><div className="operation-count"><strong>{reporting}/{devices}</strong><span>devices reporting</span></div><div className="status-breakdown"><div><span><i className="status-dot good"/>Reporting</span><b>{reporting}</b></div><div><span><i className="status-dot"/>Unavailable</span><b>{devices-reporting}</b></div><div><span><i className="status-dot pending"/>Pending actions</span><b>{pending}</b></div></div><Link className="button tertiary" to="/events">Review operational events <ArrowRight size={15}/></Link></aside></section>;
+}
