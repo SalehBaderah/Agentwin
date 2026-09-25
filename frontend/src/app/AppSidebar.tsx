@@ -21,7 +21,7 @@ export function AppSidebar({ projectCount, openEvents }: { projectCount: number;
     <Sidebar variant="floating" collapsible="icon" className="sidebar">
       <SidebarHeader className="px-3.5 pt-6 pb-[30px] group-data-[collapsible=icon]:px-2">
         <Link to="/" onClick={close} className="flex h-[35px] items-center gap-[9px] px-2 font-heading text-[23px] font-extrabold text-foreground group-data-[collapsible=icon]:px-0">
-          <Mark />
+          <Mark animated />
           <span className="group-data-[collapsible=icon]:hidden">{strings.brand}</span>
         </Link>
       </SidebarHeader>
