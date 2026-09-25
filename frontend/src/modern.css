@@ -159,10 +159,6 @@ option {
   margin-inline: auto;
   padding: 32px;
 }
-.page-heading {
-  margin-bottom: 26px;
-  align-items: center;
-}
 h1 {
   font-size: clamp(26px, 2.4vw, 36px);
   letter-spacing: -1.2px;
@@ -173,8 +169,7 @@ h2 {
 h3 {
   font-size: 15px;
 }
-p,
-.page-heading p {
+p {
   font-size: 14px;
   line-height: 1.65;
 }
@@ -182,12 +177,6 @@ p,
   border-radius: var(--radius-panel);
   background: var(--surface);
   box-shadow: var(--light-specular);
-}
-.section-heading {
-  margin: 28px 0 14px;
-}
-.section-heading h2 {
-  font-size: 17px;
 }
 .tabs.t-tabs {
   display: flex;
@@ -252,21 +241,6 @@ p,
 .detail-relation {
   font-size: 13px;
 }
-.event-row {
-  gap: 14px;
-  padding: 18px 20px;
-  transition: background var(--duration-quick);
-}
-.event-row:hover {
-  background: var(--surface-hover);
-}
-.event-row strong {
-  font-size: 14px;
-}
-.event-row small,
-.event-row time {
-  font-size: 12px;
-}
 .onboarding {
   padding: 28px;
   min-height: 390px;
@@ -278,11 +252,6 @@ p,
 .onboarding small {
   font-size: 12px;
 }
-.global-summaries { margin-top: 20px; border-top: 1px solid var(--border); padding-top: 18px; }
-.global-summaries h3 { margin-bottom: 12px; font-size: 14px; }
-.global-summary-row { padding: 10px 0; border-top: 1px solid var(--border); }
-.global-summary-row span { color: var(--text-muted); font-size: 11px; }
-.global-summary-row p { margin: 5px 0 0; font-size: 13px; line-height: 1.5; }
 .dialog {
   color: var(--text-primary);
   background: var(--surface);
@@ -352,9 +321,6 @@ p,
   .page {
     padding: 24px;
   }
-  .page-heading {
-    flex-wrap: wrap;
-  }
 }
 @media (max-width: 800px) {
   .page {
@@ -371,31 +337,11 @@ p,
   .page {
     padding: 24px 16px;
   }
-  .page-heading {
-    gap: 18px;
-  }
-  .page-heading h1 {
-    font-size: 28px;
-  }
-  .page-heading > .primary {
-    width: 100%;
-  }
   .tabs .t-tab {
     padding-inline: 12px;
   }
   .onboarding {
     padding: 20px;
-  }
-  .event-row {
-    flex-wrap: wrap;
-    padding: 16px;
-  }
-  .event-row time {
-    display: block;
-  }
-  .event-row > div {
-    flex: 1;
-    min-width: 160px;
   }
   .dialog {
     padding: 22px;
