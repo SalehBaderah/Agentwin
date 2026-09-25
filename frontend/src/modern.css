@@ -148,6 +148,37 @@ option {
 }
 .brand-mark-physical { fill: currentColor; }
 .brand-mark-digital { fill: #7c3aed; }
+
+/* One entrance per page mount; navigation and live updates keep this SVG mounted. */
+@media (prefers-reduced-motion: no-preference) {
+  .sidebar > .brand .brand-mark {
+    --brand-assemble-duration: 400ms;
+    --brand-core-delay: 300ms;
+    --brand-core-duration: 400ms;
+    overflow: visible;
+  }
+  .sidebar > .brand .brand-mark-left,
+  .sidebar > .brand .brand-mark-right {
+    animation: brand-assemble var(--brand-assemble-duration) var(--ease-smooth-out, cubic-bezier(0.22, 1, 0.36, 1)) both;
+  }
+  .sidebar > .brand .brand-mark-left { --brand-travel: -5px; }
+  .sidebar > .brand .brand-mark-right { --brand-travel: 5px; }
+  .sidebar > .brand .brand-mark-core {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: brand-sync var(--brand-core-duration) ease-out var(--brand-core-delay) both;
+  }
+}
+@keyframes brand-assemble {
+  from { opacity: 0; transform: translateX(var(--brand-travel)); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes brand-sync {
+  0% { opacity: 0; transform: scale(0.9); }
+  45% { opacity: 1; transform: scale(1); }
+  70% { opacity: 1; transform: scale(1.12); }
+  100% { opacity: 1; transform: scale(1); }
+}
 .version {
   font-size: 9px;
   background: var(--surface-hover);
