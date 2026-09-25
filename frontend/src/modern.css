@@ -41,8 +41,7 @@ button:disabled {
 .primary:hover {
   background: var(--accent-hover) !important;
 }
-.ghost,
-.tertiary {
+.ghost {
   background: transparent;
 }
 :focus-visible {
@@ -279,96 +278,6 @@ p,
 .onboarding small {
   font-size: 12px;
 }
-.appearance-settings {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 24px;
-  padding: 26px;
-  margin-bottom: 20px;
-}
-.appearance-settings h2 {
-  margin-bottom: 6px;
-}
-.settings-content {
-  max-width: none;
-  padding: 26px;
-}
-.monitoring-settings {
-  margin-bottom: 20px;
-  padding: 26px;
-}
-.monitoring-heading,
-.monitoring-block-title,
-.monitoring-rule-heading,
-.monitoring-actions {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 18px;
-}
-.monitoring-heading h2 { margin: 0 0 5px; }
-.monitoring-heading p,
-.monitoring-block-title p,
-.monitoring-rule-heading small,
-.monitoring-field small {
-  display: block;
-  margin: 4px 0 0;
-  color: var(--text-secondary);
-  font-size: 12px;
-  line-height: 1.5;
-}
-.monitoring-heading > label,
-.monitoring-field,
-.monitoring-rule label {
-  display: grid;
-  gap: 6px;
-  color: var(--text-primary);
-  font-size: 13px;
-  font-weight: 600;
-}
-.monitoring-heading select { min-width: 200px; }
-.monitoring-settings input,
-.monitoring-settings select { min-height: 38px; }
-.monitoring-settings input[type="checkbox"] { min-height: auto; accent-color: var(--accent); }
-.monitoring-block {
-  padding: 22px 0;
-  border-top: 1px solid var(--border);
-}
-.monitoring-heading + form .monitoring-block:first-child { margin-top: 22px; }
-.monitoring-block-title { justify-content: flex-start; align-items: center; margin-bottom: 18px; }
-.monitoring-block-title > svg { flex: 0 0 auto; color: var(--accent-text); }
-.monitoring-block-title h3 { margin: 0; font-size: 15px; }
-.monitoring-field { max-width: 370px; }
-.monitoring-rule-heading { align-items: center; margin: 22px 0 10px; }
-.monitoring-rule-heading strong { font-size: 13px; }
-.monitoring-rule-heading button { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
-.monitoring-rule {
-  display: grid;
-  grid-template-columns: minmax(160px, 2fr) minmax(100px, 1fr) minmax(100px, 1fr) 38px;
-  align-items: end;
-  gap: 10px;
-  max-width: 740px;
-  margin-top: 10px;
-}
-.monitoring-rule select,
-.monitoring-rule input { width: 100%; }
-.monitoring-remove { display: grid; place-items: center; width: 38px; min-height: 38px; padding: 0; border-color: var(--border); background: transparent; color: var(--text-secondary); }
-.monitoring-remove:hover { color: var(--danger); border-color: var(--danger-border); }
-.monitoring-empty { margin: 8px 0 0; color: var(--text-muted); font-size: 13px; }
-.monitoring-checks { display: flex; flex-wrap: wrap; gap: 8px 26px; margin-top: 15px; }
-.monitoring-check { display: inline-flex; align-items: center; gap: 8px; width: auto; margin: 0; font-size: 13px; }
-.monitoring-check input[type="checkbox"] { width: 16px; height: 16px; flex: 0 0 16px; margin: 0; padding: 0; }
-.monitoring-inline { display: inline-flex; align-items: center; gap: 8px; }
-.monitoring-inline input { width: 95px; }
-.monitoring-block .monitoring-check + .monitoring-field { margin-top: 15px; }
-.monitoring-delivery { margin: 15px 0 0; font-size: 12px; }
-.monitoring-delivery.ready { color: var(--success); }
-.monitoring-delivery.needs-setup { color: var(--warning); }
-.monitoring-actions { align-items: center; border-top: 1px solid var(--border); padding-top: 18px; }
-.monitoring-actions p { margin: 0; font-size: 13px; }
-.monitoring-actions .error-text { color: var(--danger); }
 .global-summaries { margin-top: 20px; border-top: 1px solid var(--border); padding-top: 18px; }
 .global-summaries h3 { margin-bottom: 12px; font-size: 14px; }
 .global-summary-row { padding: 10px 0; border-top: 1px solid var(--border); }
@@ -488,14 +397,6 @@ p,
     flex: 1;
     min-width: 160px;
   }
-  .appearance-settings,
-  .settings-content {
-    padding: 20px;
-  }
-  .measurement {
-    flex-wrap: wrap;
-    gap: 12px;
-  }
   .dialog {
     padding: 22px;
   }
@@ -515,13 +416,3 @@ p,
 }
 
 /* Win is part of the project workspace, with a compact rail when collapsed. */
-@media (max-width: 760px) {
-  .monitoring-settings { padding: 20px; }
-  .monitoring-heading { flex-direction: column; }
-  .monitoring-heading > label,
-  .monitoring-heading select { width: 100%; }
-  .monitoring-rule-heading { align-items: flex-start; }
-  .monitoring-rule { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 38px; }
-  .monitoring-rule label:first-child { grid-column: 1 / -1; }
-  .monitoring-actions { flex-wrap: wrap; }
-}

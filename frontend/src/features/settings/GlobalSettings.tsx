@@ -1,10 +1,13 @@
-import type { State } from "@/types";
 import { useEffect, useState } from "react";
-import { api, strings } from "@/types";
+import { Card } from "@/components/ui/card";
+import { Page } from "@/components/Page";
+import { PageHeading } from "@/components/PageHeading";
+import { StatusBadge } from "@/components/StatusBadge";
+import type { ServiceHealth } from "@/app/types";
 import { ProjectMonitoringSettings } from "@/features/settings/MonitoringSettings";
 import { ThemeSwitcher } from "@/theme";
-import type { ServiceHealth } from "@/app/types";
-import { StatusBadge as Badge } from "@/components/StatusBadge";
+import type { State } from "@/types";
+import { api, strings } from "@/types";
 
 export function GlobalSettings({ states }: { states: State[] }) {
   const [health, setHealth] = useState<ServiceHealth | null>(null);
@@ -13,51 +16,37 @@ export function GlobalSettings({ states }: { states: State[] }) {
       .then(setHealth)
       .catch(() => {});
   }, []);
+  const rows: [string, React.ReactNode][] = [
+    ["MQTT broker", <StatusBadge tone={health?.mqtt ? "success" : "warning"}>{health?.mqtt ? "Connected" : "Disconnected"}</StatusBadge>],
+    ["AI provider", health?.agent_configured ? "Configured · request needed to verify availability" : strings.unavailable],
+    ["Rejected MQTT messages", health?.mqtt_rejections ?? "—"],
+  ];
   return (
-    <main className="page">
-      <div className="page-heading">
+    <Page>
+      <PageHeading eyebrow="Workspace configuration" title="Settings" description="Configure live alerts, Win summaries, and email delivery for each project." />
+      <ProjectMonitoringSettings states={states} emailConfigured={health?.email_configured ?? false} defaultRecipientConfigured={health?.email_default_recipient_configured ?? false} />
+      <Card className="mb-1 flex-row flex-wrap items-center justify-between gap-6 p-[26px] max-[540px]:p-5">
         <div>
-          <div className="eyebrow">Workspace configuration</div>
-          <h1>Settings</h1>
-          <p>Configure live alerts, Win summaries, and email delivery for each project.</p>
+          <h2 className="mb-1.5 text-lg leading-normal font-bold tracking-[-0.3px]">Appearance</h2>
+          <p className="text-sm leading-[1.65] text-muted-foreground">Choose a theme, or follow your device. Your preference is saved in this browser.</p>
         </div>
-      </div>
-      <ProjectMonitoringSettings states={states} emailConfigured={health?.email_configured ?? false} defaultRecipientConfigured={health?.email_default_recipient_configured ?? false}/>
-      <section className="panel appearance-settings"><div><h2>Appearance</h2><p>Choose a theme, or follow your device. Your preference is saved in this browser.</p></div><ThemeSwitcher/></section>
-      <section className="panel settings-content">
-        <h2>Service availability</h2>
-        <div className="measurement">
-          <span>MQTT broker</span>
-          <Badge tone={health?.mqtt ? "success" : "warning"}>
-            {health?.mqtt ? "Connected" : "Disconnected"}
-          </Badge>
+        <ThemeSwitcher />
+      </Card>
+      <Card className="block p-[26px] max-[540px]:p-5">
+        <h2 className="mb-[15px] text-lg leading-normal font-bold tracking-[-0.3px]">Service availability</h2>
+        {rows.map(([label, value]) => (
+          <div key={label} className="flex items-center justify-between gap-3 border-b py-[15px] text-[13px] max-[720px]:flex-wrap">
+            <span>{label}</span>
+            <span>{value}</span>
+          </div>
+        ))}
+        <h3 className="mt-[22px] mb-2 text-[15px] leading-normal font-bold">Setup notes</h3>
+        <div className="mb-[18px] grid gap-[18px] text-sm leading-[1.65] text-muted-foreground">
+          <p>Configure provider and SMTP credentials in the backend .env file. Device identity, field mapping, and inventory are defined when a project is created.</p>
+          <p>The MVP binds to loopback. See docs/hardware.md before connecting a device or exposing the broker to a private network.</p>
+          <p>RF calibration, trained anomaly models, and behavioral simulation are unavailable. Physical control is limited to declared capabilities.</p>
         </div>
-        <div className="measurement">
-          <span>AI provider</span>
-          <span>
-            {health?.agent_configured
-              ? "Configured · request needed to verify availability"
-              : strings.unavailable}
-          </span>
-        </div>
-        <div className="measurement">
-          <span>Rejected MQTT messages</span>
-          <span>{health?.mqtt_rejections ?? "—"}</span>
-        </div>
-        <h3>Setup notes</h3>
-        <p>
-          Configure provider and SMTP credentials in the backend .env file. Device identity,
-          field mapping, and inventory are defined when a project is created.
-        </p>
-        <p>
-          The MVP binds to loopback. See docs/hardware.md before connecting a
-          device or exposing the broker to a private network.
-        </p>
-        <p>
-          RF calibration, trained anomaly models, and behavioral simulation are
-          unavailable. Physical control is limited to declared capabilities.
-        </p>
-      </section>
-    </main>
+      </Card>
+    </Page>
   );
 }

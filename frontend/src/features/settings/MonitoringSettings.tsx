@@ -1,6 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { Bell, Clock3, Mail, Plus, Trash2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { OptionSelect } from "@/components/OptionSelect";
+import { cn } from "@/lib/utils";
 import type { MonitoringSettings as Monitoring, Project, State, ThresholdRule } from "@/types";
 import { api } from "@/types";
 
@@ -8,6 +15,32 @@ const copy = (settings: Monitoring): Monitoring => ({
   ...settings,
   threshold_rules: settings.threshold_rules.map((rule) => ({ ...rule })),
 });
+
+function Field({ id, label, hint, className, children }: { id: string; label: string; hint?: React.ReactNode; className?: string; children: React.ReactNode }) {
+  return (
+    <div className={cn("grid content-start gap-2", className)}>
+      <Label htmlFor={id} className="mb-[7px] text-[13px] font-semibold">{label}</Label>
+      {children}
+      {hint && <p className="text-xs leading-normal text-subtle-foreground">{hint}</p>}
+    </div>
+  );
+}
+
+function Block({ icon, title, description, children }: { icon: React.ReactNode; title: string; description: string; children: React.ReactNode }) {
+  return (
+    <div className="border-t py-[22px]">
+      <div className="mb-[18px] flex items-center gap-[18px] [&>svg]:size-[17px] [&>svg]:shrink-0 [&>svg]:text-brand">
+        {icon}
+        <div><h3 className="m-0 text-[15px] leading-normal font-bold">{title}</h3><p className="mt-1 text-xs leading-normal text-subtle-foreground">{description}</p></div>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function SwitchRow({ id, checked, onCheckedChange, children }: { id: string; checked: boolean; onCheckedChange: (checked: boolean) => void; children: React.ReactNode }) {
+  return <div className="flex items-center gap-2"><Switch id={id} checked={checked} onCheckedChange={onCheckedChange} /><Label htmlFor={id} className="text-[13px] font-normal text-subtle-foreground">{children}</Label></div>;
+}
 
 export function ProjectMonitoringSettings({ states, emailConfigured, defaultRecipientConfigured }: { states: State[]; emailConfigured: boolean; defaultRecipientConfigured: boolean }) {
   const location = useLocation();
@@ -30,7 +63,7 @@ export function ProjectMonitoringSettings({ states, emailConfigured, defaultReci
     setDraft(copy(target.project.monitoring));
     setMessage("");
   }, [requested, selected, states]);
-  if (!selected || !draft) return <section className="panel monitoring-settings"><h2>Project monitoring</h2><p>Add a project to configure alerts and summaries.</p></section>;
+  if (!selected || !draft) return <Card className="mb-1 gap-0 p-[26px] max-[760px]:p-5"><h2 className="text-lg leading-normal font-bold tracking-[-0.3px]">Project monitoring</h2><p className="mt-1 text-sm text-muted-foreground">Add a project to configure alerts and summaries.</p></Card>;
   const project = selected.project;
   const numericFields = Object.entries(project.graph.fields).filter(([, field]) => field.data_type === "number");
   const change = (patch: Partial<Monitoring>) => { setDraft({ ...draft, ...patch }); setMessage(""); };
@@ -58,18 +91,74 @@ export function ProjectMonitoringSettings({ states, emailConfigured, defaultReci
       setFailed(true); setMessage((error as Error).message);
     } finally { setBusy(false); }
   };
-  return <section className="panel monitoring-settings" aria-label="Project monitoring settings">
-    <div className="monitoring-heading"><div><h2>Project monitoring</h2><p>Rules apply to live device data. New projects start with silence monitoring and no threshold limits.</p></div><label>Project<select value={selectedId} onChange={(event) => { const next = states.find((state) => state.project.id === event.target.value); if (next) { setSelectedId(next.project.id); setDraft(copy(next.project.monitoring)); setMessage(""); } }}>{states.map((state) => <option key={state.project.id} value={state.project.id}>{state.project.name}</option>)}</select></label></div>
-    <form onSubmit={save}>
-      <div className="monitoring-block"><div className="monitoring-block-title"><Bell size={17}/><div><h3>Alerts</h3><p>Silence is checked per device after its first valid reading.</p></div></div>
-        <label className="monitoring-field">Alert after device silence<input type="number" min={project.freshness_seconds} max="86400" required value={draft.silence_seconds} onChange={(event) => change({ silence_seconds: Number(event.target.value) })}/><small>Seconds; at least the project's {project.freshness_seconds}s freshness limit.</small></label>
-        <div className="monitoring-rule-heading"><div><strong>Optional threshold rules</strong><small>Only numeric fields can use limits. No rule means no threshold alert.</small></div><button className="tertiary" type="button" onClick={addRule} disabled={!numericFields.length || draft.threshold_rules.length >= numericFields.length * 2}><Plus size={15}/> Add limit</button></div>
-        {draft.threshold_rules.map((rule, index) => <div className="monitoring-rule" key={`${index}-${rule.field_key}-${rule.direction}`}><label>Field<select value={rule.field_key} onChange={(event) => editRule(index, { field_key: event.target.value })}>{numericFields.map(([key, field]) => <option key={key} value={key}>{field.label} ({field.unit || key})</option>)}</select></label><label>When<select value={rule.direction} onChange={(event) => editRule(index, { direction: event.target.value as ThresholdRule["direction"] })}><option value="above">Above</option><option value="below">Below</option></select></label><label>Limit<input type="number" step="any" required value={Number.isNaN(rule.limit) ? "" : rule.limit} onChange={(event) => editRule(index, { limit: event.target.value === "" ? Number.NaN : Number(event.target.value) })}/></label><button className="monitoring-remove" type="button" aria-label={`Remove limit ${index + 1}`} onClick={() => change({ threshold_rules: draft.threshold_rules.filter((_, current) => current !== index) })}><Trash2 size={16}/></button></div>)}
-        {!draft.threshold_rules.length && <p className="monitoring-empty">No threshold alerts for this project.</p>}
+  const selectProject = (value: string) => {
+    const next = states.find((state) => state.project.id === value);
+    if (next) { setSelectedId(next.project.id); setDraft(copy(next.project.monitoring)); setMessage(""); }
+  };
+  const deliveryReady = emailConfigured && (draft.email_to || defaultRecipientConfigured);
+  return (
+    <Card className="mb-1 gap-0 p-[26px] max-[760px]:p-5" aria-label="Project monitoring settings" role="region">
+      <div className="monitoring-heading flex items-start justify-between gap-[18px] max-[760px]:flex-col">
+        <div>
+          <h2 className="mb-[5px] text-lg leading-normal font-bold tracking-[-0.3px]">Project monitoring</h2>
+          <p className="text-xs leading-normal text-subtle-foreground">Rules apply to live device data. New projects start with silence monitoring and no threshold limits.</p>
+        </div>
+        <Field id="monitoring-project" label="Project" className="min-w-[200px] shrink-0 max-[760px]:w-full">
+          <OptionSelect id="monitoring-project" value={selectedId} onValueChange={selectProject} options={states.map((state) => ({ value: state.project.id, label: state.project.name }))} />
+        </Field>
       </div>
-      <div className="monitoring-block"><div className="monitoring-block-title"><Clock3 size={17}/><div><h3>Scheduled summaries</h3><p>One live-session summary is saved in Win and Events each interval.</p></div></div><label className="monitoring-check"><input type="checkbox" checked={draft.summary_enabled} onChange={(event) => change({ summary_enabled: event.target.checked })}/> Create summaries automatically</label><label className="monitoring-field">Every <span className="monitoring-inline"><input type="number" min="1" max="1440" step="1" required value={draft.summary_interval_minutes} onChange={(event) => change({ summary_interval_minutes: Number(event.target.value) })}/> minutes</span><small>Any whole number from 1 to 1,440. Changing this starts a new interval.</small></label></div>
-      <div className="monitoring-block"><div className="monitoring-block-title"><Mail size={17}/><div><h3>Email delivery</h3><p>Alerts and summaries use the same configured recipient.</p></div></div><label className="monitoring-field">Recipient email<input type="email" value={draft.email_to ?? ""} onChange={(event) => change({ email_to: event.target.value || null })} placeholder={defaultRecipientConfigured ? "Using server default" : "operator@example.com"}/><small>Leave empty to use the server default recipient, if configured.</small></label><div className="monitoring-checks"><label className="monitoring-check"><input type="checkbox" checked={draft.alert_email_enabled} onChange={(event) => change({ alert_email_enabled: event.target.checked })}/> Email new alerts</label><label className="monitoring-check"><input type="checkbox" checked={draft.summary_email_enabled} onChange={(event) => change({ summary_email_enabled: event.target.checked })}/> Email each summary</label></div><p className={`monitoring-delivery ${emailConfigured && (draft.email_to || defaultRecipientConfigured) ? "ready" : "needs-setup"}`}>{!emailConfigured ? "Email is not ready: configure SMTP in the backend .env file." : draft.email_to || defaultRecipientConfigured ? "SMTP sender and recipient are configured." : "Add a recipient here or set a server default to send email."}</p></div>
-      <div className="monitoring-actions"><p role="status" className={failed ? "error-text" : ""}>{message}</p><button className="primary" type="submit" disabled={busy}>{busy ? "Saving…" : "Save monitoring settings"}</button></div>
-    </form>
-  </section>;
+      <form onSubmit={save} className="mt-10">
+        <Block icon={<Bell />} title="Alerts" description="Silence is checked per device after its first valid reading.">
+          <Field id="silence" label="Alert after device silence" hint={`Seconds; at least the project's ${project.freshness_seconds}s freshness limit.`} className="max-w-[370px]">
+            <Input id="silence" type="number" min={project.freshness_seconds} max="86400" required value={draft.silence_seconds} onChange={(event) => change({ silence_seconds: Number(event.target.value) })} />
+          </Field>
+          <div className="mt-[22px] mb-2.5 flex items-center justify-between gap-[18px] max-[760px]:items-start">
+            <div>
+              <strong className="block text-[13px] font-bold">Optional threshold rules</strong>
+              <span className="mt-1 block text-xs leading-normal text-subtle-foreground">Only numeric fields can use limits. No rule means no threshold alert.</span>
+            </div>
+            <Button type="button" variant="outline" size="lg" className="gap-1.5 px-3.5 font-normal text-subtle-foreground [&_svg]:size-[15px]" onClick={addRule} disabled={!numericFields.length || draft.threshold_rules.length >= numericFields.length * 2}><Plus />Add limit</Button>
+          </div>
+          {draft.threshold_rules.map((rule, index) => (
+            <div key={`${index}-${rule.field_key}-${rule.direction}`} className="mt-2.5 grid max-w-[740px] grid-cols-[minmax(160px,2fr)_minmax(100px,1fr)_minmax(100px,1fr)_44px] items-end gap-2.5 max-[760px]:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_44px]">
+              <Field id={`rule-${index}-field`} label="Field" className="max-[760px]:col-span-full">
+                <OptionSelect id={`rule-${index}-field`} value={rule.field_key} onValueChange={(value) => editRule(index, { field_key: value })} options={numericFields.map(([key, field]) => ({ value: key, label: `${field.label} (${field.unit || key})` }))} />
+              </Field>
+              <Field id={`rule-${index}-direction`} label="When">
+                <OptionSelect id={`rule-${index}-direction`} value={rule.direction} onValueChange={(value) => editRule(index, { direction: value as ThresholdRule["direction"] })} options={[{ value: "above", label: "Above" }, { value: "below", label: "Below" }]} />
+              </Field>
+              <Field id={`rule-${index}-limit`} label="Limit">
+                <Input id={`rule-${index}-limit`} type="number" step="any" required value={Number.isNaN(rule.limit) ? "" : rule.limit} onChange={(event) => editRule(index, { limit: event.target.value === "" ? Number.NaN : Number(event.target.value) })} />
+              </Field>
+              <Button type="button" variant="outline" size="icon" className="size-11 rounded-[10px] bg-transparent text-subtle-foreground hover:border-danger-border hover:text-danger dark:bg-transparent" aria-label={`Remove limit ${index + 1}`} onClick={() => change({ threshold_rules: draft.threshold_rules.filter((_, current) => current !== index) })}><Trash2 /></Button>
+            </div>
+          ))}
+          {!draft.threshold_rules.length && <p className="mt-2 text-[13px] text-muted-foreground">No threshold alerts for this project.</p>}
+        </Block>
+        <Block icon={<Clock3 />} title="Scheduled summaries" description="One live-session summary is saved in Win and Events each interval.">
+          <SwitchRow id="summary-enabled" checked={draft.summary_enabled} onCheckedChange={(checked) => change({ summary_enabled: checked })}>Create summaries automatically</SwitchRow>
+          <Field id="summary-interval" label="Every" hint="Any whole number from 1 to 1,440. Changing this starts a new interval." className="mt-[15px] max-w-[370px]">
+            <div className="flex items-center gap-2">
+              <Input id="summary-interval" type="number" min="1" max="1440" step="1" required className="w-[95px]" value={draft.summary_interval_minutes} onChange={(event) => change({ summary_interval_minutes: Number(event.target.value) })} />
+              <span className="text-[13px] font-semibold">minutes</span>
+            </div>
+          </Field>
+        </Block>
+        <Block icon={<Mail />} title="Email delivery" description="Alerts and summaries use the same configured recipient.">
+          <Field id="email-to" label="Recipient email" hint="Leave empty to use the server default recipient, if configured." className="max-w-[370px]">
+            <Input id="email-to" type="email" value={draft.email_to ?? ""} onChange={(event) => change({ email_to: event.target.value || null })} placeholder={defaultRecipientConfigured ? "Using server default" : "operator@example.com"} />
+          </Field>
+          <div className="mt-[15px] flex flex-wrap gap-x-[26px] gap-y-2">
+            <SwitchRow id="alert-email" checked={draft.alert_email_enabled} onCheckedChange={(checked) => change({ alert_email_enabled: checked })}>Email new alerts</SwitchRow>
+            <SwitchRow id="summary-email" checked={draft.summary_email_enabled} onCheckedChange={(checked) => change({ summary_email_enabled: checked })}>Email each summary</SwitchRow>
+          </div>
+          <p className={cn("mt-[15px] text-xs leading-[1.65]", deliveryReady ? "text-success" : "text-warning")}>{!emailConfigured ? "Email is not ready: configure SMTP in the backend .env file." : draft.email_to || defaultRecipientConfigured ? "SMTP sender and recipient are configured." : "Add a recipient here or set a server default to send email."}</p>
+        </Block>
+        <div className="monitoring-actions flex items-center justify-between gap-[18px] border-t pt-[18px] max-[760px]:flex-wrap">
+          <p role="status" className={cn("text-[13px]", failed ? "text-danger" : "text-muted-foreground")}>{message}</p>
+          <Button type="submit" size="lg" disabled={busy}>{busy ? "Saving…" : "Save monitoring settings"}</Button>
+        </div>
+      </form>
+    </Card>
+  );
 }

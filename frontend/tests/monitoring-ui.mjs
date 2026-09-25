@@ -1,6 +1,7 @@
 import { chromium, expect } from "@playwright/test";
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
+import { chooseValue } from "./helpers.mjs";
 
 const base = process.env.AGENTWIN_BASE || "http://127.0.0.1:8002";
 const projectId = process.env.AGENTWIN_PROJECT_ID;
@@ -15,13 +16,13 @@ try {
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto(`${base}/settings?project=${projectId}`);
   await expect(page.getByRole("heading", { name: "Project monitoring" })).toBeVisible();
-  const projectSelector = page.locator(".monitoring-heading select");
-  await expect(projectSelector).toHaveValue(projectId);
+  const projectSelector = page.locator(".monitoring-heading [role=combobox]");
+  await expect(projectSelector).toHaveAttribute("data-value", projectId);
   if (otherProjectId) {
-    await projectSelector.selectOption(otherProjectId);
+    await chooseValue(page, projectSelector, otherProjectId);
     await page.waitForTimeout(1500);
-    await expect(projectSelector).toHaveValue(otherProjectId);
-    await projectSelector.selectOption(projectId);
+    await expect(projectSelector).toHaveAttribute("data-value", otherProjectId);
+    await chooseValue(page, projectSelector, projectId);
   }
   await expect(page.getByLabel("Alert after device silence")).toHaveValue("30");
   await expect(page.getByLabel("Every")).toHaveValue("10");
@@ -33,7 +34,7 @@ try {
   await page.getByRole("button", { name: "Save monitoring settings" }).click();
   await expect(page.locator(".monitoring-actions [role='status']")).toHaveText("Monitoring settings saved.");
   await page.reload();
-  await expect(page.locator(".monitoring-heading select")).toHaveValue(projectId);
+  await expect(page.locator(".monitoring-heading [role=combobox]")).toHaveAttribute("data-value", projectId);
   await expect(page.getByRole("spinbutton", { name: "Limit" })).toHaveValue("30");
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({ path: join(artifacts, "monitoring-settings-review.png"), fullPage: true });
