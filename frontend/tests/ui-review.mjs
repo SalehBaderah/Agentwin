@@ -75,9 +75,9 @@ try {
   await page
     .getByRole("button", { name: "Manage project", exact: true })
     .click();
-  await expect(page.getByRole("dialog")).toBeVisible();
+  await expect(page.getByRole("alertdialog")).toBeVisible();
   await page.keyboard.press("Escape");
-  await expect(page.getByRole("dialog")).not.toBeVisible();
+  await expect(page.getByRole("alertdialog")).not.toBeVisible();
   await expect(
     page.getByRole("button", { name: "Manage project", exact: true }),
   ).toBeFocused();
@@ -112,11 +112,11 @@ try {
           await page.locator(".tab-content").waitFor();
         if (name === "add") await page.getByLabel("Project name").waitFor();
         await expect(
-          page.getByText("Backend connected", { exact: true }),
-        ).toBeVisible();
+          page.getByText("Backend disconnected · snapshot only"),
+        ).toHaveCount(0);
         await page.evaluate(() => document.fonts.ready);
         if (name === "twin")
-          await page.locator(".live-twin-canvas canvas").first().waitFor();
+          await page.locator(".physical-svg").first().waitFor();
         await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
         const overflow = await page.evaluate(() => ({
           width: innerWidth,
@@ -157,7 +157,7 @@ try {
   await page.emulateMedia({ reducedMotion: "reduce" });
   expect(
     await page
-      .locator(".sidebar")
+      .locator(".app-shell")
       .evaluate((e) => getComputedStyle(e).transitionDuration),
   ).toBe("0s");
   checks.push("Reduced motion disables surface transitions");

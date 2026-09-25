@@ -1,6 +1,8 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { flushSync } from "react-dom";
 import { Monitor, Moon, Sun } from "lucide-react";
+import { Toggle } from "@/components/ui/toggle";
+import { cn } from "@/lib/utils";
 
 type Preference = "dark" | "light" | "system";
 const ThemeContext = createContext<{
@@ -67,32 +69,29 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
+const themeOptions = [
+  { value: "light", label: "Light", Icon: Sun },
+  { value: "dark", label: "Dark", Icon: Moon },
+  { value: "system", label: "System", Icon: Monitor },
+] as const;
+
 export function ThemeSwitcher({ compact = false }: { compact?: boolean }) {
   const { preference, change } = useContext(ThemeContext);
   return (
-    <div
-      className={`theme-switcher ${compact ? "compact" : ""}`}
-      role="group"
-      aria-label="Color theme"
-    >
-      {(
-        [
-          { value: "light", label: "Light", Icon: Sun },
-          { value: "dark", label: "Dark", Icon: Moon },
-          { value: "system", label: "System", Icon: Monitor },
-        ] as const
-      ).map(({ value, label, Icon }) => (
-        <button
+    <div className="inline-flex items-center gap-1 rounded-xl border bg-card p-1" role="group" aria-label="Color theme">
+      {themeOptions.map(({ value, label, Icon }) => (
+        <Toggle
           key={value}
-          type="button"
+          size="sm"
+          pressed={preference === value}
+          onPressedChange={() => change(value)}
           aria-label={`${label} theme`}
           title={`${label} theme`}
-          aria-pressed={preference === value}
-          onClick={() => change(value)}
+          className={cn("rounded-[10px] border border-transparent text-muted-foreground data-[state=on]:border-input data-[state=on]:bg-secondary data-[state=on]:text-foreground data-[state=on]:shadow-sm", compact ? "size-8 min-w-0 px-0" : "h-10 gap-2 px-3.5 text-[13px] font-normal")}
         >
-          <Icon size={16} />
-          <span>{label}</span>
-        </button>
+          <Icon />
+          {!compact && <span>{label}</span>}
+        </Toggle>
       ))}
     </div>
   );

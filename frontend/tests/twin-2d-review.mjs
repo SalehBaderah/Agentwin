@@ -45,8 +45,8 @@ try {
   await page.waitForTimeout(350);
   await page.locator('.live-twin-workspace').screenshot({ path: join(artifacts, 'twin-flow-review.png') });
   await page.getByRole('tab', { name: 'Physical 2D' }).click();
-  const simulated = await page.locator('.source-picker option').filter({ hasText: 'simulated' }).getAttribute('value');
-  await page.locator('.source-picker select').selectOption(simulated);
+  await page.locator('.source-picker [role=combobox]').click();
+  await page.locator('[role="option"]').filter({ hasText: 'simulated' }).first().click();
   await page.locator('.session-kicker.simulation').waitFor();
   await page.locator('.twin2d-caption', { hasText: 'SIMULATION' }).waitFor();
 
