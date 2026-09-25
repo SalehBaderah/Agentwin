@@ -1,0 +1,146 @@
+/* Layer order: legacy CSS beats Tailwind preflight but loses to shadcn components and utilities. */
+@layer theme, base, legacy, components, utilities;
+
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "./tokens.css";
+@import "./motion.css" layer(legacy);
+@import "./styles.css" layer(legacy);
+@import "./modern.css" layer(legacy);
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* shadcn variable names that do not collide with tokens.css. */
+:root {
+  --foreground: var(--text-primary);
+  --card: var(--surface);
+  --card-foreground: var(--text-primary);
+  --popover: var(--surface);
+  --popover-foreground: var(--text-primary);
+  --destructive: var(--danger);
+  --input: var(--border-strong);
+  --ring: var(--accent-text);
+  --radius: var(--radius-control);
+  --chart-1: var(--operational-cyan);
+  --chart-2: var(--accent-text);
+  --chart-3: var(--success);
+  --chart-4: var(--warning);
+  --chart-5: var(--info);
+  --sidebar: var(--sidebar-glass);
+  --sidebar-foreground: var(--text-secondary);
+  --sidebar-primary: var(--accent);
+  --sidebar-primary-foreground: var(--accent-foreground);
+  --sidebar-accent: var(--accent-subtle);
+  --sidebar-accent-foreground: var(--text-primary);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--accent-text);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--accent);
+  --color-primary-foreground: var(--accent-foreground);
+  --color-secondary: var(--surface-elevated);
+  --color-secondary-foreground: var(--text-primary);
+  --color-muted: var(--surface-elevated);
+  --color-muted-foreground: var(--text-muted);
+  --color-accent: var(--surface-hover);
+  --color-accent-foreground: var(--text-primary);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  /* Agentwin semantic extras. */
+  --color-subtle-foreground: var(--text-secondary);
+  --color-brand: var(--accent-text);
+  --color-brand-subtle: var(--accent-subtle);
+  --color-brand-border: var(--accent-border);
+  --color-operational: var(--operational-cyan);
+  --color-success: var(--success);
+  --color-success-subtle: var(--success-subtle);
+  --color-warning: var(--warning);
+  --color-warning-subtle: var(--warning-subtle);
+  --color-warning-border: var(--warning-border);
+  --color-danger: var(--danger);
+  --color-danger-subtle: var(--danger-subtle);
+  --color-danger-border: var(--danger-border);
+  --color-info: var(--info);
+  --color-glass: var(--glass);
+  --color-backdrop: var(--backdrop);
+  --radius-sm: calc(var(--radius-control) - 4px);
+  --radius-md: calc(var(--radius-control) - 2px);
+  --radius-lg: var(--radius-control);
+  --radius-xl: var(--radius-panel);
+  --radius-2xl: var(--radius-dialog);
+  --font-sans: "DM Sans Variable", "Segoe UI", sans-serif;
+  --font-heading: "Manrope Variable", "DM Sans Variable", "Segoe UI", sans-serif;
+  --shadow-elevated: var(--shadow-panel);
+  --shadow-overlay: var(--shadow-dialog);
+  --ease-smooth: var(--ease-smooth-out);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background font-sans text-foreground antialiased;
+  }
+  h1, h2, h3, h4 {
+    font-family: var(--font-heading);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation: none !important;
+      transition-duration: 0s !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/* shadcn elements carry data-slot; roll back every legacy declaration on them to Tailwind's base layer. */
+@layer legacy {
+  [data-slot][data-slot][data-slot] {
+    all: revert-layer;
+  }
+  /* Legacy markup relied on UA defaults that preflight resets; restore them (zero specificity, so legacy rules still win). */
+  :where(:is(h1, h2, h3, h4, h5, h6):not([data-slot], [data-slot] *)) {
+    margin: revert;
+    font-weight: revert;
+  }
+  :where(:is(svg, img):not([data-slot], [data-slot] *)) {
+    display: revert;
+    vertical-align: revert;
+  }
+  :where(dialog:not([data-slot])) {
+    margin: revert;
+  }
+  :where(button:not([data-slot])) {
+    appearance: revert;
+  }
+  :where(option) {
+    padding: revert;
+  }
+  :where(:is(code, kbd, samp, pre):not([data-slot], [data-slot] *)) {
+    font-family: revert;
+  }
+}

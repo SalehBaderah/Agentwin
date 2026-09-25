@@ -1,3 +1,4 @@
+@layer legacy {
 :root {
   --tabs-dur: 250ms;
   --tabs-ease: cubic-bezier(0.22, 1, 0.36, 1);
@@ -263,4 +264,5 @@
 
 @media (prefers-reduced-motion: reduce) {
   .twin-view-frame { animation: none; }
+}
 }

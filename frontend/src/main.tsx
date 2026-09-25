@@ -53,10 +53,7 @@ import { api, display, strings, time } from "./types";
 import { ProjectMonitoringSettings } from "./MonitoringSettings";
 import "@fontsource-variable/dm-sans";
 import "@fontsource-variable/manrope";
-import "./tokens.css";
-import "./motion.css";
-import "./styles.css";
-import "./modern.css";
+import "./index.css";
 import { ThemeProvider, ThemeSwitcher } from "./theme";
 import { Dialog, Tabs } from "./ui";
 
