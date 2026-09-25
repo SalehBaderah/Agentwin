@@ -37,15 +37,15 @@ try {
   await page.locator(".workspace-grid > .workspace-agent").waitFor();
   await check(await page.locator(".workspace-main .agent-mini").count() === 0, "Project agent must remain outside workspace-main");
   await page.getByRole("button", { name: "What changed recently?" }).click();
-  await check(await page.getByPlaceholder("Ask about a reading, change, event, or allowed action").inputValue() === "What changed recently?", "Agent prompt did not populate the question");
+  await check(await page.getByPlaceholder("Ask Win about this system...").inputValue() === "What changed recently?", "Agent prompt did not populate the question");
   await page.getByText("browser-temp-02", { exact: true }).waitFor();
   await page.getByText("USB connector", { exact: true }).waitFor();
   await page.getByRole("tab", { name: "Live readings" }).click();
   await page.getByRole("heading", { name: "Readings" }).waitFor();
   await page.getByRole("tab", { name: "Digital twin" }).click();
-  await page.locator(".live-twin-canvas canvas").first().waitFor();
+  await page.locator(".physical-svg").first().waitFor();
   await page.screenshot({ path: output + "/platform-live-twin.png", fullPage: true });
-  await page.getByRole("button", { name: /USB connector/ }).focus();
+  await page.getByRole("button", { name: "Inspect USB connector", exact: true }).focus();
   await page.keyboard.press("Enter");
   await page.getByRole("heading", { name: "USB connector", exact: true }).waitFor();
   await page.getByLabel("Selected component details").waitFor();
@@ -59,7 +59,7 @@ try {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(base + "/projects/" + createdId);
   await page.getByRole("tab", { name: "Digital twin" }).click();
-  await page.locator(".live-twin-canvas canvas").first().waitFor();
+  await page.locator(".physical-svg").first().waitFor();
   await check(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "Horizontal overflow on mobile Twin");
   await page.screenshot({ path: output + "/platform-mobile.png", fullPage: true });
   await check(errors.length === 0, `Browser errors: ${errors.join("\n")}`);

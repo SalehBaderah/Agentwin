@@ -117,7 +117,7 @@ try {
     }),
   );
   await page
-    .getByRole("button", { name: "Ask project agent", exact: true })
+    .getByRole("button", { name: "Send question to Win", exact: true })
     .click();
   await expect(page.getByRole("alert")).toHaveText(
     "Review fixture: provider unavailable",

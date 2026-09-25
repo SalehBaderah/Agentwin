@@ -112,11 +112,11 @@ try {
           await page.locator(".tab-content").waitFor();
         if (name === "add") await page.getByLabel("Project name").waitFor();
         await expect(
-          page.getByText("Backend connected", { exact: true }),
-        ).toBeVisible();
+          page.getByText("Backend disconnected · snapshot only"),
+        ).toHaveCount(0);
         await page.evaluate(() => document.fonts.ready);
         if (name === "twin")
-          await page.locator(".live-twin-canvas canvas").first().waitFor();
+          await page.locator(".physical-svg").first().waitFor();
         await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
         const overflow = await page.evaluate(() => ({
           width: innerWidth,
