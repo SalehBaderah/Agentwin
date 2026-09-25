@@ -5,5 +5,44 @@ services:
       - "${MQTT_BIND_IP:-127.0.0.1}:1883:1883"
     volumes:
       - ./broker:/mosquitto/config
-    command: ["mosquitto", "-c", "/mosquitto/config/private-network.conf"]
+    # Set MQTT_BROKER_CONFIG=mosquitto.conf for the anonymous, loopback-only dev broker.
+    command: ["mosquitto", "-c", "/mosquitto/config/${MQTT_BROKER_CONFIG:-private-network.conf}"]
+    restart: unless-stopped
+
+  app:
+    build: .
+    ports:
+      - "127.0.0.1:8000:8000"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      MQTT_HOST: broker
+      MQTT_PORT: "1883"
+      DATABASE_PATH: /app/data/agentwin.db
+      # LM Studio runs on the host, not in the container.
+      LLM_BASE_URL: ${DOCKER_LLM_BASE_URL:-http://host.docker.internal:1234/v1}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      - broker
+    restart: unless-stopped
+
+  # Virtual devices + sample projects for testing without hardware:
+  #   docker compose --profile demo up -d
+  demo:
+    build: .
+    profiles: ["demo"]
+    command: ["python", "-m", "simulator.demo"]
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      MQTT_HOST: broker
+      MQTT_PORT: "1883"
+      AGENTWIN_API_URL: http://app:8000/api
+    depends_on:
+      - app
     restart: unless-stopped
