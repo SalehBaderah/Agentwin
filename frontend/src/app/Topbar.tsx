@@ -19,8 +19,8 @@ export function Topbar({ states, connected, health, projectContext, selectedProj
   const reporting = states.reduce((total, state) => total + state.devices.filter((device) => device.reporting).length, 0);
   const contextMode = projectContext ? sessionLabel(projectContext.mode) : null;
   return (
-    <header className="sticky top-3 z-20 mx-4 mt-3 mb-2 flex h-[70px] items-center gap-2 rounded-2xl border bg-sidebar px-5 shadow-elevated md:top-[18px] md:mt-4 md:mr-7 md:mb-8 md:ml-8 md:h-[76px] md:gap-4 md:px-8">
-      <Button variant="ghost" size="icon" className="md:hidden" aria-label="Toggle navigation" onClick={toggleSidebar}><Menu /></Button>
+    <header className="sticky top-3 z-20 mx-4 mt-3 mb-2 flex h-[70px] items-center gap-2 rounded-2xl border bg-sidebar px-5 shadow-elevated shell:top-[18px] shell:mt-4 shell:mr-7 shell:mb-8 shell:ml-8 shell:h-[76px] shell:gap-4 shell:px-8">
+      <Button variant="ghost" size="icon" className="shell:hidden" aria-label="Toggle navigation" onClick={toggleSidebar}><Menu /></Button>
       <SystemSwitcher states={states} selectedProjectId={selectedProjectId} />
       <div className="ml-auto flex shrink-0 items-center gap-2">
         <CommandLauncher open={searchOpen} onOpenChange={onSearchOpenChange} states={states} />

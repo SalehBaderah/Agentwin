@@ -37,6 +37,11 @@
   --sidebar-ring: var(--accent-text);
 }
 
+/* Legacy layout switched between the mobile and rail shell at 800px. */
+@theme {
+  --breakpoint-shell: 50.0625rem;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

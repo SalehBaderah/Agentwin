@@ -200,24 +200,7 @@ p,
   background: var(--surface);
   box-shadow: var(--light-specular);
 }
-.overview-signal {
-  min-height: 106px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-panel);
-  background: var(--surface);
-  box-shadow: var(--light-specular);
-  padding: 22px 24px;
-}
-.overview-signal p,
-.overview-signal > a {
-  font-size: 13px;
-}
-.signal-mark {
-  border-radius: 12px;
-  background: var(--accent-subtle);
-}
-.stats,
-.overview-stats {
+.stats {
   border-radius: var(--radius-panel);
   overflow: hidden;
 }
@@ -226,105 +209,6 @@ p,
 }
 .section-heading h2 {
   font-size: 17px;
-}
-.project-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-  border: 0;
-  background: transparent;
-}
-.project-card {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 0;
-  padding: 22px;
-  min-height: 240px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-panel);
-  background: var(--surface);
-  box-shadow: var(--light-specular);
-  overflow: hidden;
-  margin-top: 1.5px; /* Gives space for the -2px hover transform */
-  transition:
-    border-color var(--duration-quick),
-    transform var(--duration-fast) var(--ease-smooth-out);
-}
-.project-card:hover {
-  background: var(--surface);
-  border-color: var(--accent-border);
-  transform: translateY(-2px);
-}
-.project-card .card-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 18px;
-}
-.project-card .card-top .badge {
-  display: inline-flex;
-}
-.project-card .project-icon {
-  border-radius: 10px;
-  background: var(--background-secondary);
-}
-.project-card .project-type {
-  font-size: 12px;
-  margin-bottom: 4px;
-  align-self: flex-start;
-}
-.project-card h3 {
-  font-size: 19px;
-  margin: 0 0 8px;
-  align-self: auto;
-}
-.project-card .arabic,
-.project-card > p {
-  display: block;
-  font-size: 13px;
-}
-.project-card .card-metric {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 12px;
-  margin: 18px 0;
-  padding: 14px 0 0;
-  border-top: 1px solid var(--border);
-}
-.project-card .card-metric strong {
-  font-size: 24px;
-}
-.project-card .card-footer {
-  display: flex;
-  justify-content: space-between;
-  text-align: left;
-  gap: 12px;
-  flex-wrap: wrap;
-  margin-top: auto;
-  padding: 0;
-}
-.project-card .card-footer span {
-  justify-content: flex-start;
-  font-size: 12px;
-}
-.analytics-grid {
-  gap: 18px;
-}
-.panel-heading {
-  flex-wrap: wrap;
-  gap: 18px;
-}
-.compact-filters {
-  flex-wrap: wrap;
-}
-.compact-filters label {
-  min-width: 100px;
-  flex: 1;
-}
-.overview-chart {
-  min-height: 280px;
 }
 .status-line {
   gap: 12px;
@@ -780,8 +664,7 @@ p,
 }
 @supports (backdrop-filter: blur(16px)) {
   .dialog,
-  .workspace-agent .agent-mini,
-  .overview-signal {
+  .workspace-agent .agent-mini {
     background: var(--surface-glass);
     backdrop-filter: blur(var(--glass-blur)) saturate(130%);
     -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(130%);
@@ -802,11 +685,6 @@ p,
 ::view-transition-new(root) {
   animation-duration: var(--duration-fast);
   animation-timing-function: var(--ease-smooth-out);
-}
-@media (min-width: 1750px) {
-  .project-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
 }
 @media (max-width: 1180px) {
   .workspace-grid {
@@ -832,17 +710,11 @@ p,
   .page {
     padding: 24px;
   }
-  .analytics-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
   .project-actions {
     width: 100%;
   }
   .page-heading {
     flex-wrap: wrap;
-  }
-  .project-grid {
-    grid-template-columns: minmax(0, 1fr);
   }
 }
 @media (max-width: 800px) {
@@ -859,9 +731,6 @@ p,
   }
   .page {
     padding: 24px 20px;
-  }
-  .overview-stats {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
   .stepper.setup-stepper {
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -885,23 +754,6 @@ p,
   }
   .page-heading > .primary {
     width: 100%;
-  }
-  .overview-signal {
-    grid-template-columns: 1fr;
-    padding: 20px;
-    gap: 12px;
-  }
-  .overview-signal > a {
-    grid-column: auto;
-  }
-  .signal-mark {
-    display: none;
-  }
-  .overview-stats {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .project-card {
-    padding: 20px;
   }
   .agent-mini {
     display: flex;
