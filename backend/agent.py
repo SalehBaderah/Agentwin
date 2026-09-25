@@ -49,6 +49,12 @@ def provider_configured():
     return provider == 'openai' and bool(os.getenv('OPENAI_API_KEY'))
 
 
+def local_reasoning_options():
+    """Thinking models (e.g. Gemma 4) spend the small token budget on reasoning; LLM_REASONING_EFFORT=none disables it."""
+    effort = os.getenv('LLM_REASONING_EFFORT')
+    return {'reasoning_effort': effort} if effort else {}
+
+
 def deterministic_summary(facts):
     devices = facts['devices']
     samples = sum(device['samples'] for device in devices)
@@ -93,7 +99,7 @@ async def scheduled_summary(facts, client=None):
                     {'role': 'user', 'content': json.dumps({'baseline': model_baseline, 'facts': model_facts}, separators=(',', ':'))},
                 ],
                 response_format={'type': 'json_schema', 'json_schema': {'name': 'scheduled_summary', 'strict': True, 'schema': {'type': 'object', 'properties': {'summary': {'type': 'string'}}, 'required': ['summary'], 'additionalProperties': False}}},
-                temperature=0, max_tokens=180,
+                temperature=0, max_tokens=180, **local_reasoning_options(),
             )
         candidate = json.loads(result.choices[0].message.content or '{}').get('summary', '')
         if isinstance(candidate, str) and 0 < len(candidate.strip()) <= 500:
@@ -319,6 +325,7 @@ async def answer_local(store, pid, sid, question, client=None, component_id=None
             response_format=CHAT_ANSWER_FORMAT,
             temperature=0,
             max_tokens=300,
+            **local_reasoning_options(),
         )
     parsed = parse_operational_answer(result.choices[0].message.content or '')
     return store_answer(store, pid, sid, question, parsed, evidence)

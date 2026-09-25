@@ -1,0 +1,15 @@
+.git
+.venv
+.env
+data
+**/node_modules
+**/dist
+**/__pycache__
+.pytest_cache
+artifacts
+firmware
+broker
+docs
+evals
+tests
+*.log
