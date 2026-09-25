@@ -39,9 +39,9 @@ export function PlatformAnalytics({ states }: { states: State[] }) {
             <CardDescription>Stored observations only; missing samples remain gaps.</CardDescription>
           </div>
           <div className="grid w-full gap-3 sm:flex sm:w-auto sm:flex-wrap sm:justify-end sm:gap-2">
-            <FormField id="analytics-project" label="Project"><OptionSelect id="analytics-project" value={selected.project.id} onValueChange={(value) => { setProjectId(value); setMetricKey(""); }} options={states.map((state) => ({ value: state.project.id, label: state.project.name }))} className="sm:w-44" /></FormField>
-            <FormField id="analytics-metric" label="Metric"><OptionSelect id="analytics-metric" value={field} onValueChange={setMetricKey} options={visibleFields.map(([key, item]) => ({ value: key, label: item.label }))} className="sm:w-40" /></FormField>
-            <FormField id="analytics-window" label="Window"><OptionSelect id="analytics-window" value={windowSize} onValueChange={setWindowSize} options={[{ value: "30", label: "Latest 30" }, { value: "90", label: "Latest 90" }, { value: "all", label: "All stored" }]} className="sm:w-32" /></FormField>
+            <FormField id="analytics-project" label="Project"><OptionSelect size="sm" id="analytics-project" value={selected.project.id} onValueChange={(value) => { setProjectId(value); setMetricKey(""); }} options={states.map((state) => ({ value: state.project.id, label: state.project.name }))} className="sm:w-44" /></FormField>
+            <FormField id="analytics-metric" label="Metric"><OptionSelect size="sm" id="analytics-metric" value={field} onValueChange={setMetricKey} options={visibleFields.map(([key, item]) => ({ value: key, label: item.label }))} className="sm:w-40" /></FormField>
+            <FormField id="analytics-window" label="Window"><OptionSelect size="sm" id="analytics-window" value={windowSize} onValueChange={setWindowSize} options={[{ value: "30", label: "Latest 30" }, { value: "90", label: "Latest 90" }, { value: "all", label: "All stored" }]} className="sm:w-32" /></FormField>
           </div>
         </CardHeader>
         <div className="px-6">

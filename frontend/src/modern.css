@@ -458,9 +458,6 @@ p,
 .verification-note {
   font-size: 13px;
 }
-.onboarding-page {
-  max-width: 1200px;
-}
 .onboarding {
   padding: 28px;
   min-height: 390px;
@@ -471,41 +468,6 @@ p,
 }
 .onboarding small {
   font-size: 12px;
-}
-.extra-device {
-  background: var(--background-secondary);
-  padding: 18px;
-  border-radius: var(--radius-control);
-}
-.extra-device {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-.stepper.setup-stepper {
-  margin-bottom: 22px;
-  gap: 8px;
-}
-.stepper li {
-  font-size: 12px;
-  padding: 12px;
-  border-radius: var(--radius-control);
-}
-.stepper li.active {
-  background: var(--accent-subtle);
-  color: var(--text-primary);
-}
-.stepper li.active > span {
-  background: var(--accent);
-  color: var(--accent-foreground);
-}
-.config-summary dd {
-  overflow-wrap: anywhere;
-}
-.form-actions {
-  border-top: 1px solid var(--border);
-  padding-top: 22px;
-  margin-top: 26px;
-  justify-content: flex-end;
-  gap: 12px;
 }
 .appearance-settings {
   display: flex;
@@ -732,9 +694,6 @@ p,
   .page {
     padding: 24px 20px;
   }
-  .stepper.setup-stepper {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
   button,
   .button,
   input,
@@ -774,15 +733,6 @@ p,
   .onboarding {
     padding: 20px;
   }
-  .onboarding .form-step,
-  .extra-device {
-    grid-template-columns: minmax(0, 1fr);
-  }
-  .stepper li {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
-  }
   .control-state {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -807,9 +757,6 @@ p,
   }
   .dialog {
     padding: 22px;
-  }
-  .config-summary {
-    grid-template-columns: 1fr;
   }
 }
 @media (prefers-reduced-motion: reduce) {

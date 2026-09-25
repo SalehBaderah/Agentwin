@@ -1,5 +1,6 @@
 import { chromium } from "@playwright/test";
 import fs from "node:fs";
+import { chooseValue } from "./helpers.mjs";
 const output = "../artifacts";
 fs.mkdirSync(output, { recursive: true });
 const browser = await chromium.launch({ channel: "msedge", headless: true });
@@ -18,10 +19,10 @@ try {
   await page.getByRole("heading", { name: "Add a project" }).waitFor();
   await page.screenshot({ path: output + "/platform-onboarding.png", fullPage: true });
   await page.getByLabel("Project name").fill("Browser temperature");
-  await page.getByLabel("Starting template").selectOption("temperature");
+  await chooseValue(page, page.getByLabel("Starting template"), "temperature");
   await page.getByRole("button", { name: "Continue" }).click();
   await page.getByLabel("Device ID").fill("browser-temp-01");
-  await page.getByLabel("Transport").selectOption("mqtt");
+  await chooseValue(page, page.getByLabel("Transport"), "mqtt");
   await page.getByRole("button", { name: "Add device" }).click();
   await page.getByLabel("Device ID").nth(1).fill("browser-temp-02");
   await page.getByLabel("Serial port").fill("COM8");
