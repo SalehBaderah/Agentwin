@@ -1,13 +1,11 @@
-/* Layer order: legacy CSS beats Tailwind preflight but loses to shadcn components and utilities. */
-@layer theme, base, legacy, components, utilities;
+@layer theme, base, components, utilities;
 
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 @import "./tokens.css";
-@import "./motion.css" layer(legacy);
-@import "./styles.css" layer(legacy);
-@import "./modern.css" layer(legacy);
+/* React Flow base styles sit in components so the Twin overrides in live-twin.css win. */
+@import "@xyflow/react/dist/style.css" layer(components);
 
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
@@ -121,33 +119,5 @@
       transition-duration: 0s !important;
       scroll-behavior: auto !important;
     }
-  }
-}
-
-/* shadcn elements carry data-slot; roll back every legacy declaration on them to Tailwind's base layer. */
-@layer legacy {
-  [data-slot][data-slot][data-slot] {
-    all: revert-layer;
-  }
-  /* Legacy markup relied on UA defaults that preflight resets; restore them (zero specificity, so legacy rules still win). */
-  :where(:is(h1, h2, h3, h4, h5, h6):not([data-slot], [data-slot]:not([data-slot^=sidebar]) *)) {
-    margin: revert;
-    font-weight: revert;
-  }
-  :where(:is(svg, img):not([data-slot], [data-slot]:not([data-slot^=sidebar]) *)) {
-    display: revert;
-    vertical-align: revert;
-  }
-  :where(dialog:not([data-slot])) {
-    margin: revert;
-  }
-  :where(button:not([data-slot])) {
-    appearance: revert;
-  }
-  :where(option) {
-    padding: revert;
-  }
-  :where(:is(code, kbd, samp, pre):not([data-slot], [data-slot]:not([data-slot^=sidebar]) *)) {
-    font-family: revert;
   }
 }

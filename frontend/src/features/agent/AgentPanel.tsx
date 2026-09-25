@@ -38,7 +38,7 @@ export function AgentPanel({ state, onCollapse }: { state: State; onCollapse?: (
     <Card className="agent-mini flex h-full max-h-[inherit] flex-col gap-3.5 overflow-hidden rounded-[14px] bg-glass p-4 backdrop-blur" aria-label="Win project assistant" role="region">
       <div className="flex items-center gap-[9px]">
         <WinAvatar />
-        <div className="min-w-0 flex-1"><h3 className="text-lg leading-tight font-bold">Win</h3><p className="mt-[3px] text-xs text-muted-foreground">Project AI Assistant</p></div>
+        <div className="min-w-0 flex-1"><h3 className="mb-2 text-lg leading-tight font-bold">Win</h3><p className="mt-[3px] text-xs text-muted-foreground">Project AI Assistant</p></div>
         {onCollapse && <Button variant="outline" size="icon" className="rounded-lg text-subtle-foreground" aria-label="Collapse Win assistant" title="Collapse Win" onClick={onCollapse}><PanelRightClose /></Button>}
       </div>
       <ScrollArea className="-mx-4 min-h-0 flex-1">

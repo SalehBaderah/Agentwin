@@ -1,5 +1,13 @@
 # Frontend modernization
 
+## shadcn/ui migration (2026-09)
+
+The frontend now uses shadcn/ui (Radix, `radix-nova` style) on Tailwind CSS v4. `src/index.css` bridges shadcn's theme tokens onto the unchanged palette in `src/tokens.css`, so dark, light and system themes look the same as before. Dark mode keys off the existing `data-theme` attribute via `@custom-variant dark`. The legacy stylesheets (`styles.css`, `modern.css`, `motion.css`) and the hand-built `Dialog`/`Tabs` in `ui.tsx` were removed. `main.tsx` was split into `src/app/` (shell) and `src/features/*` (pages). Shared building blocks live in `src/components/`, and generated shadcn components in `src/components/ui/`.
+
+Test hooks: Radix `Select` replaces native `<select>`. Triggers and options carry `data-value`, and `tests/helpers.mjs` exposes `chooseValue(page, trigger, value)`. The delete confirmation is an `AlertDialog` (role `alertdialog`). `tests/project-actions-layout.mjs` now checks the live project page instead of static HTML.
+
+Digital Twin: the chrome (header, view switch, status bar, zoom controls, inspector, activity, legend) uses utilities and shadcn components. `src/features/digital-twin/live-twin.css` keeps only the stage, canvas, SVG and React Flow node rules, in `@layer components`. React Flow's own stylesheet is imported into the same layer from `index.css` so those overrides apply.
+
 ## Scope and architecture
 
 Agentwin remains a React 19 / Vite application using React Router, plain CSS, Lucide, Recharts, and React Flow. The existing routes, component data flows, API client, subscriptions, freshness calculations, onboarding state, graph model, and command verification contracts remain in place. No backend, gateway, firmware, schema, or dependency versions changed.
@@ -12,9 +20,9 @@ The audit found presentation and operational logic together in `frontend/src/mai
 | --- | --- |
 | `frontend/src/tokens.css` | Semantic dark/light colors, surfaces, status colors, typography aliases, radii, spacing, shadows, blur, motion, and chrome elevation. |
 | `frontend/src/theme.tsx`, `frontend/index.html` | Dark / Light / System provider and switchers. Validated localStorage preference, pre-render theme initialization, system-change listener, cross-tab synchronization, blocked-storage fallback, native color scheme and theme-color metadata. One root crossfade on supported browsers, with reduced-motion fallback. |
-| `frontend/src/ui.tsx` | Reusable native modal dialog with Escape, focus containment/restoration and backdrop dismissal; measured sliding tabs with roving focus, arrow/Home/End keys, and tab-panel associations. |
-| `frontend/src/motion.css` | Installed transitions.dev modal, sliding-tab and panel-reveal CSS. Reference snippets remain intact; product-specific inspector timing is scoped in modern.css. |
-| `frontend/src/styles.css`, `frontend/src/modern.css` | Shared native button/form/status/panel treatments; accessible focus and disabled/error states; page and workspace layouts; theme-aware charts, graph, minimap and inspector; restored project-card status and metadata. |
+| `frontend/src/ui.tsx` (superseded by the shadcn migration; removed) | Reusable native modal dialog with Escape, focus containment/restoration and backdrop dismissal; measured sliding tabs with roving focus, arrow/Home/End keys, and tab-panel associations. |
+| `frontend/src/motion.css` (superseded by the shadcn migration; removed) | Installed transitions.dev modal, sliding-tab and panel-reveal CSS. Reference snippets remain intact; product-specific inspector timing is scoped in modern.css. |
+| `frontend/src/styles.css`, `frontend/src/modern.css` (superseded by the shadcn migration; removed) | Shared native button/form/status/panel treatments; accessible focus and disabled/error states; page and workspace layouts; theme-aware charts, graph, minimap and inspector; restored project-card status and metadata. |
 | `frontend/src/main.tsx` | Collapsible desktop navigation rail, mobile navigation dialog, skip link, Settings appearance controls, project-management confirmation, semantic tabs, theme-aware chart/graph styling and agent request-error display. |
 | `frontend/tests/*`, `frontend/package.json` | Configurable smoke URL, responsive/theme review, isolated MQTT device fixture and operational browser checks; `test:ui` and `test:operations` scripts. |
 | `.agents/skills/*`, `skills-lock.json` | Requested transitions.dev and transitions-polish installation. |

@@ -20,7 +20,7 @@ export function ControlsPanel({ state, refresh }: { state: State; refresh: () =>
   };
   return (
     <div className="grid gap-4">
-      <div><h3 className="pb-[5px] text-[17px] font-bold tracking-[-0.3px]">Hardware controls</h3><p className="text-[13px] text-muted-foreground">Commands remain pending until the target device reports the expected state.</p></div>
+      <div><h3 className="mb-2 pb-[5px] text-[17px] font-bold tracking-[-0.3px]">Hardware controls</h3><p className="text-[13px] leading-[1.65] text-muted-foreground">Commands remain pending until the target device reports the expected state.</p></div>
       {controls.length ? controls.map(({ component, control }) => {
         const latestAction = state.actions.find((action) => action.target === component.id);
         const ready = controlReady(state, state.project, control);

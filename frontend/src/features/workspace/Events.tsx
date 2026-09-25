@@ -23,7 +23,7 @@ export function Events({ state, refresh }: { state: State; refresh: () => void }
   };
   return (
     <div className="grid gap-4">
-      <div><h3 className="pb-2 text-[13px] font-bold">Events & history</h3><p className="text-[13px] text-muted-foreground">Actual triggers, supporting readings, and recovery.</p></div>
+      <div><h3 className="mb-2 pb-2 text-[13px] font-bold">Events & history</h3><p className="text-[13px] leading-[1.65] text-muted-foreground">Actual triggers, supporting readings, and recovery.</p></div>
       {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
       {state.events.length ? state.events.map((e) => (
         <Card key={e.id} className="event-item gap-0 py-0">

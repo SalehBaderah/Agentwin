@@ -56,7 +56,7 @@ export function Overview({ states, projectOnly = false }: { states: State[]; pro
                   <StatusBadge tone={s.status === "reporting" ? "success" : "neutral"}>{s.status}</StatusBadge>
                 </div>
                 <div className="text-[13px] font-semibold text-muted-foreground">{s.project.template.replaceAll("_", " ")} template</div>
-                <h3 className="text-lg font-semibold">{s.project.name}</h3>
+                <h3 className="mb-2 text-lg font-semibold">{s.project.name}</h3>
                 {s.project.arabic_title && <div className="text-sm text-subtle-foreground" dir="rtl" lang="ar">{s.project.arabic_title}</div>}
                 <p className="line-clamp-2 text-sm text-muted-foreground">{s.project.description}</p>
                 <div className="flex items-baseline justify-between rounded-lg bg-muted px-3 py-2">

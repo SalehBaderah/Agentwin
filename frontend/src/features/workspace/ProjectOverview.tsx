@@ -23,7 +23,7 @@ export function ProjectOverview({ state }: { state: State }) {
       </div>
       <div className="grid gap-3.5 lg:grid-cols-2">
         <Card className="min-h-64 gap-0 rounded-[14px] p-[18px]">
-          <CardHeader className="flex items-center justify-between gap-3 px-0 pb-2.5"><CardTitle><h3 className="text-sm font-bold">Devices</h3></CardTitle><span className="text-xs text-muted-foreground">{state.devices.filter((device) => device.reporting).length}/{state.devices.length} reporting</span></CardHeader>
+          <CardHeader className="flex items-center justify-between gap-3 px-0 pb-2.5"><CardTitle><h3 className="mb-2 text-sm font-bold">Devices</h3></CardTitle><span className="text-xs text-muted-foreground">{state.devices.filter((device) => device.reporting).length}/{state.devices.length} reporting</span></CardHeader>
           {state.devices.map((device) => (
             <div key={device.id} className="flex items-center justify-between gap-3.5 border-t py-2.5">
               <div><strong className="block text-sm font-medium">{device.id}</strong><small className="text-xs text-muted-foreground">{device.connector.toUpperCase()} connector</small></div>
@@ -32,13 +32,13 @@ export function ProjectOverview({ state }: { state: State }) {
           ))}
         </Card>
         <Card className="min-h-64 gap-0 rounded-[14px] p-[18px]">
-          <CardHeader className="flex items-center justify-between gap-3 px-0 pb-2.5"><CardTitle><h3 className="text-sm font-bold">Recent actions</h3></CardTitle><span className="text-xs text-muted-foreground">Latest {Math.min(state.actions.length, 5)}</span></CardHeader>
+          <CardHeader className="flex items-center justify-between gap-3 px-0 pb-2.5"><CardTitle><h3 className="mb-2 text-sm font-bold">Recent actions</h3></CardTitle><span className="text-xs text-muted-foreground">Latest {Math.min(state.actions.length, 5)}</span></CardHeader>
           {state.actions.length ? state.actions.slice(0, 5).map((action) => (
             <div key={action.id} className="flex items-center justify-between gap-3.5 border-t py-2.5">
               <div><strong className="block text-sm font-medium">{humanAction(action.action)}</strong><CompactId value={action.id} /></div>
               <StatusBadge tone={action.status === "completed" ? "success" : action.status === "requested" ? "warning" : "neutral"}>{action.status.replaceAll("_", " ")}</StatusBadge>
             </div>
-          )) : <p className="text-[13px] text-muted-foreground">No commands have been requested.</p>}
+          )) : <p className="text-[13px] leading-[1.65] text-muted-foreground">No commands have been requested.</p>}
         </Card>
       </div>
     </div>

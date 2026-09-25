@@ -133,7 +133,7 @@ export function ProjectMonitoringSettings({ states, emailConfigured, defaultReci
               <Button type="button" variant="outline" size="icon" className="size-11 rounded-[10px] bg-transparent text-subtle-foreground hover:border-danger-border hover:text-danger dark:bg-transparent" aria-label={`Remove limit ${index + 1}`} onClick={() => change({ threshold_rules: draft.threshold_rules.filter((_, current) => current !== index) })}><Trash2 /></Button>
             </div>
           ))}
-          {!draft.threshold_rules.length && <p className="mt-2 text-[13px] text-muted-foreground">No threshold alerts for this project.</p>}
+          {!draft.threshold_rules.length && <p className="mt-2 text-[13px] leading-[1.65] text-muted-foreground">No threshold alerts for this project.</p>}
         </Block>
         <Block icon={<Clock3 />} title="Scheduled summaries" description="One live-session summary is saved in Win and Events each interval.">
           <SwitchRow id="summary-enabled" checked={draft.summary_enabled} onCheckedChange={(checked) => change({ summary_enabled: checked })}>Create summaries automatically</SwitchRow>

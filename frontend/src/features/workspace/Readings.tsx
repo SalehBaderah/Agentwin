@@ -20,7 +20,7 @@ export function Readings({ state }: { state: State }) {
   return (
     <div className="grid gap-4">
       <div className="flex flex-wrap items-end justify-between gap-4">
-        <div><h3 className="pb-2 text-[13px] font-bold">Readings</h3><p className="text-[13px] text-muted-foreground">{metric.data_type === "number" ? "Stored observations for this project and selected session." : "State changes only; repeated samples with the same value are collapsed."}</p></div>
+        <div><h3 className="mb-2 pb-2 text-[13px] font-bold">Readings</h3><p className="text-[13px] leading-[1.65] text-muted-foreground">{metric.data_type === "number" ? "Stored observations for this project and selected session." : "State changes only; repeated samples with the same value are collapsed."}</p></div>
         <FormField id="readings-metric" label="Metric"><OptionSelect id="readings-metric" value={field} onValueChange={(value) => { setField(value); setTransitionLimit(5); }} className="sm:w-56" options={Object.entries(state.project.graph.fields).map(([key, item]) => ({ value: key, label: `${item.label} ${item.unit}` }))} /></FormField>
       </div>
       {!rows.length ? (

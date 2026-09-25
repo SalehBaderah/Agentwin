@@ -1,6 +1,5 @@
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
-import "@xyflow/react/dist/style.css";
 import "@fontsource-variable/dm-sans";
 import "@fontsource-variable/manrope";
 import "./index.css";
