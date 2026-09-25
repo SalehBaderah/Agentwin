@@ -1,3 +1,4 @@
+import { Button } from "@/components/ui/button";
 import { Focus, Minus, Plus, RotateCcw } from "lucide-react";
 import type { TwinComponentState, TwinState } from "../model/twin.types";
 import { useSvgViewport } from "./useSvgViewport";
@@ -69,7 +70,12 @@ export function PhysicalTwin({ twin, selectedId, onSelect }: { twin: TwinState; 
       <rect x="-2000" y="-2000" width="5000" height="5000" fill="#0e1520"/><rect width={WIDTH} height={height} fill="url(#physical-grid)"/>
       {positioned.map((item) => <DeviceAssembly key={item.id} twin={twin} deviceId={item.id} offsetY={item.y} selectedId={selectedId} onSelect={onSelect}/>)}
     </svg>
-    <div className="twin-zoom-controls" role="group" aria-label="Physical view controls"><button onClick={() => viewport.zoomAt(.82)} aria-label="Zoom in"><Plus size={16}/></button><button onClick={() => viewport.zoomAt(1.22)} aria-label="Zoom out"><Minus size={16}/></button><button onClick={viewport.fit} aria-label="Fit view"><Focus size={16}/></button><button onClick={viewport.reset} aria-label="Reset view"><RotateCcw size={16}/></button></div>
+    <div className="absolute bottom-3.5 left-3.5 flex rounded-[9px] border border-[var(--border-strong)] bg-[color-mix(in_srgb,var(--surface)_88%,transparent)] p-[3px] shadow-[0_8px_24px_var(--shadow-color)] backdrop-blur-[10px] max-[430px]:bottom-2.5 max-[430px]:left-2.5" role="group" aria-label="Physical view controls">
+      <Button variant="ghost" size="icon" className="h-[34px] w-9 rounded-md text-subtle-foreground hover:bg-accent hover:text-foreground max-[430px]:size-10" onClick={() => viewport.zoomAt(.82)} aria-label="Zoom in"><Plus /></Button>
+      <Button variant="ghost" size="icon" className="h-[34px] w-9 rounded-md text-subtle-foreground hover:bg-accent hover:text-foreground max-[430px]:size-10" onClick={() => viewport.zoomAt(1.22)} aria-label="Zoom out"><Minus /></Button>
+      <Button variant="ghost" size="icon" className="h-[34px] w-9 rounded-md text-subtle-foreground hover:bg-accent hover:text-foreground max-[430px]:size-10" onClick={viewport.fit} aria-label="Fit view"><Focus /></Button>
+      <Button variant="ghost" size="icon" className="h-[34px] w-9 rounded-md text-subtle-foreground hover:bg-accent hover:text-foreground max-[430px]:size-10" onClick={viewport.reset} aria-label="Reset view"><RotateCcw /></Button>
+    </div>
     <div className="twin2d-hint">Drag to pan · Scroll or pinch to zoom · Select a part to inspect</div>
   </div>;
 }

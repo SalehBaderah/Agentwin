@@ -156,7 +156,7 @@ export function Workspace({ connected, onContextChange }: { connected: boolean; 
         <Stat label="Open events" value={state.events.filter((e) => !e.recovered).length} hint="Acknowledgement does not mean recovery" icon={<Bell />} />
       </div>
       <p className="source-note mb-2 text-[13px] leading-[1.7] text-subtle-foreground">{state.session.mode === "live" ? "Live data is scoped to this project and its registered devices." : "Test data is isolated from live device state and never routes physical commands."}</p>
-      <div className={cn("workspace-grid relative grid min-w-0 gap-2.5", agentCollapsed ? "md:grid-cols-[minmax(0,1fr)_auto]" : "md:grid-cols-[minmax(0,1fr)_10px_var(--agent-width)]")} style={{ "--agent-width": `${agentWidth}px` } as React.CSSProperties}>
+      <div className={cn("workspace-grid relative grid min-w-0 gap-2.5", agentCollapsed ? "md:grid-cols-[minmax(0,1fr)_auto]" : "min-[1181px]:grid-cols-[minmax(0,1fr)_10px_var(--agent-width)]")} style={{ "--agent-width": `${agentWidth}px` } as React.CSSProperties}>
         <section className="workspace-main min-w-0 overflow-hidden rounded-[14px] border bg-card">
           <Tabs value={tab} onValueChange={setTab} className="gap-0">
             <ScrollArea className="w-full border-b bg-[var(--background-secondary)]"><SlidingTabsList value={tab} items={tabs} aria-label="Project views" className="bg-transparent" /><ScrollBar orientation="horizontal" /></ScrollArea>
@@ -171,7 +171,7 @@ export function Workspace({ connected, onContextChange }: { connected: boolean; 
             <TabsContent value="controls" className={panelClass("controls")}><ControlsPanel state={state} refresh={refresh} /></TabsContent>
           </Tabs>
         </section>
-        {!agentCollapsed && <button type="button" className="relative hidden cursor-col-resize after:absolute after:inset-y-0 after:left-1/2 after:w-px after:bg-border after:transition-colors hover:after:bg-brand focus-visible:outline-none focus-visible:after:w-0.5 focus-visible:after:bg-brand md:block" aria-label="Resize agent panel" title="Drag to resize; use arrow keys; double-click to reset" onPointerDown={startAgentResize} onKeyDown={nudgeAgentWidth} onDoubleClick={() => { setAgentWidth(380); localStorage.setItem("agentwin-agent-width", "380"); }} />}
+        {!agentCollapsed && <button type="button" className="relative hidden cursor-col-resize after:absolute after:inset-y-0 after:left-1/2 after:w-px after:bg-border after:transition-colors hover:after:bg-brand focus-visible:outline-none focus-visible:after:w-0.5 focus-visible:after:bg-brand min-[1181px]:block" aria-label="Resize agent panel" title="Drag to resize; use arrow keys; double-click to reset" onPointerDown={startAgentResize} onKeyDown={nudgeAgentWidth} onDoubleClick={() => { setAgentWidth(380); localStorage.setItem("agentwin-agent-width", "380"); }} />}
         <aside className={cn("workspace-agent min-w-0", !agentCollapsed && "max-md:fixed max-md:inset-0 max-md:z-40 max-md:flex max-md:items-end")} aria-label="Win project assistant" onKeyDown={(event) => { if (event.key === "Escape" && !agentCollapsed) toggleAgent(); }}>
           {!agentCollapsed && <button type="button" className="absolute inset-0 bg-backdrop md:hidden" aria-label="Close Win" onClick={toggleAgent} />}
           {agentCollapsed && (
@@ -179,7 +179,7 @@ export function Workspace({ connected, onContextChange }: { connected: boolean; 
               <img src="/assets/win.webp" alt="" className="size-8 rounded-full" /><strong className="text-xs">Win</strong>
             </Button>
           )}
-          <div hidden={agentCollapsed} className="relative max-md:max-h-[88svh] max-md:w-full max-md:overflow-y-auto max-md:rounded-t-[18px] md:sticky md:h-full md:top-20 md:max-h-[calc(100svh-6rem)]">
+          <div hidden={agentCollapsed} className="relative max-md:max-h-[88svh] max-md:w-full max-md:overflow-y-auto max-md:rounded-t-[18px] min-[1181px]:sticky min-[1181px]:top-20 min-[1181px]:h-full min-[1181px]:max-h-[calc(100svh-6rem)]">
             <AgentPanel key={`${state.project.id}:${state.session.id}`} state={state} onCollapse={toggleAgent} />
           </div>
         </aside>

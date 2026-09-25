@@ -63,7 +63,7 @@ export function AgentPanel({ state, onCollapse }: { state: State; onCollapse?: (
             <div className="flex flex-wrap gap-2">{prompts.map((prompt) => <Button key={prompt} type="button" variant="outline" size="sm" className="h-auto rounded-lg bg-muted px-[9px] py-[5px] text-xs font-normal text-subtle-foreground" onClick={() => setQuestion(prompt)}>{prompt}</Button>)}</div>
           </div>
           {!submittedQuestion && !busy && !agentError && !answer && (
-            <div className="flex flex-col items-center gap-[7px] px-5 py-2.5 text-center max-md:hidden"><WinAvatar className="size-[90px]" /><strong className="text-sm font-[650]">Ask Win about this project</strong><p className="max-w-[260px] text-xs leading-[1.45] text-muted-foreground">Explore readings, events, and permitted actions in this session.</p></div>
+            <div className="flex flex-col items-center gap-[7px] px-5 py-2.5 text-center max-[1180px]:hidden"><WinAvatar className="size-[90px]" /><strong className="text-sm font-[650]">Ask Win about this project</strong><p className="max-w-[260px] text-xs leading-[1.45] text-muted-foreground">Explore readings, events, and permitted actions in this session.</p></div>
           )}
           {(submittedQuestion || busy || agentError || answer) && (
             <div className="grid gap-3" role="log" aria-label="Win conversation" aria-live="polite">
