@@ -55,7 +55,7 @@ export function Overview({ states, projectOnly = false }: { states: State[]; pro
                   <span className="grid size-10 place-items-center rounded-lg bg-brand-subtle text-brand [&_svg]:size-5">{s.project.template === "connectivity" ? <Radio /> : <AudioLines />}</span>
                   <StatusBadge tone={s.status === "reporting" ? "success" : "neutral"}>{s.status}</StatusBadge>
                 </div>
-                <div className="text-xs tracking-wide text-muted-foreground uppercase">{s.project.template.replaceAll("_", " ")} template</div>
+                <div className="text-[13px] font-semibold text-muted-foreground">{s.project.template.replaceAll("_", " ")} template</div>
                 <h3 className="text-lg font-semibold">{s.project.name}</h3>
                 {s.project.arabic_title && <div className="text-sm text-subtle-foreground" dir="rtl" lang="ar">{s.project.arabic_title}</div>}
                 <p className="line-clamp-2 text-sm text-muted-foreground">{s.project.description}</p>

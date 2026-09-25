@@ -1,6 +1,7 @@
 import { chromium, expect } from "@playwright/test";
 import { spawn } from "node:child_process";
 import fs from "node:fs";
+import { chooseValue } from "./helpers.mjs";
 
 const base = process.env.AGENTWIN_TEST_URL || "http://127.0.0.1:5173";
 if (new URL(base).port === "8000")
@@ -33,7 +34,7 @@ try {
     { stdio: "ignore" },
   );
   await page.goto(`${base}/projects/${id}?tab=controls`);
-  await page.locator(".source-picker select").selectOption(live.id);
+  await chooseValue(page, page.locator(".source-picker [role=combobox]"), live.id);
   const on = page.getByRole("button", { name: "Turn on", exact: true });
   await expect(on).toBeEnabled({ timeout: 30000 });
   await on.click();
@@ -94,12 +95,8 @@ try {
     `${base}/api/projects/${id}/sessions/${simulated.id}/scenario`,
     { data: { scenario: "normal" } },
   );
-  await expect(
-    page
-      .locator(".source-picker select")
-      .locator(`option[value="${simulated.id}"]`),
-  ).toBeAttached({ timeout: 5000 });
-  await page.locator(".source-picker select").selectOption(simulated.id);
+  await page.locator(".source-picker [role=combobox]").click();
+  await page.locator(`[role="option"][data-value="${simulated.id}"]`).click({ timeout: 5000 });
   await page.getByRole("tab", { name: "Controls", exact: true }).click();
   await expect(on).toBeDisabled();
   await expect(page.locator(".source-note")).toContainText(

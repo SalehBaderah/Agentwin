@@ -59,8 +59,6 @@ button:disabled {
 .primary:hover {
   background: var(--accent-hover) !important;
 }
-.danger { color: var(--danger); border-color: var(--danger-border); background: transparent; }
-.project-actions { display: flex; gap: 10px; align-items: end; flex-wrap: wrap; }
 :focus-visible {
   outline: 2px solid var(--accent);
 }
@@ -122,12 +120,6 @@ button:disabled {
   align-items: center;
   gap: 24px;
   margin-bottom: 28px;
-}
-.eyebrow {
-  font-size: 13px;
-  letter-spacing: 1.6px;
-  color: var(--text-secondary);
-  font-weight: 700;
 }
 h1,
 h2,
@@ -232,27 +224,6 @@ small {
   font-size: 13px;
   color: var(--muted);
 }
-.back {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 13px;
-  color: var(--muted);
-  margin-bottom: 19px;
-}
-.project-page h1 {
-  font-size: 25px;
-}
-.project-arabic {
-  text-align: left;
-  font-size: 13px;
-}
-.source-picker label {
-  display: block;
-  color: var(--muted);
-  font-size: 13px;
-  margin-bottom: 8px;
-}
 input,
 select {
   width: 100%;
@@ -266,36 +237,9 @@ select {
 select {
   cursor: pointer;
 }
-.source-picker select {
-  width: 215px;
-}
-.status-line {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin: -10px 0 25px;
-  flex-wrap: wrap;
-}
-.status-line > span:not(.badge) {
-  font-size: 13px;
-  color: var(--muted);
-}
 .selected {
   border-color: var(--accent) !important;
   background: var(--surface-elevated) !important;
-}
-.workspace-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 304px;
-  gap: 20px;
-  align-items: start;
-}
-.workspace-main {
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--surface);
-  overflow: hidden;
-  min-width: 0;
 }
 .tabs {
   display: flex;
@@ -392,19 +336,6 @@ summary {
   border-radius: 8px;
   margin: 15px;
   font-size: 13px;
-}
-.source-note {
-  padding: 16px;
-  margin-bottom: 20px;
-  background: var(--surface-elevated);
-  border: 1px solid var(--border);
-  font-size: 13px;
-  line-height: 1.7;
-  color: var(--secondary);
-  border-radius: 8px;
-}
-.source-note button {
-  margin-left: 12px;
 }
 .twin {
   height: 380px;
@@ -608,16 +539,10 @@ label small {
   .page {
     padding-top: 42px;
   }
-  .workspace-grid {
-    grid-template-columns: minmax(0, 1fr) 340px;
-  }
 }
 @media (max-width: 1200px) {
   .page {
     padding: 28px 25px;
-  }
-  .workspace-grid {
-    grid-template-columns: minmax(0, 1fr) 265px;
   }
   .stats {
     gap: 10px;
@@ -628,9 +553,6 @@ label small {
   }
 }
 @media (max-width: 1000px) {
-  .workspace-grid {
-    grid-template-columns: 1fr;
-  }
   .stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -676,9 +598,6 @@ label small {
   .page-heading p {
     font-size: 13px;
   }
-  .eyebrow {
-    font-size: 13px;
-  }
   .stats {
     gap: 10px;
     margin-bottom: 24px;
@@ -696,12 +615,6 @@ label small {
   }
   .event-row > div {
     min-width: 150px;
-  }
-  .source-picker {
-    width: 100%;
-  }
-  .source-picker select {
-    width: 100%;
   }
   .tabs {
     gap: 18px;
@@ -799,8 +712,6 @@ label small {
 .agent-answer { display: grid; gap: 7px; padding-top: 14px; border-top: 1px solid var(--border); }
 .agent-answer strong { color: var(--text-primary); font-size: 13px; line-height: 1.55; }
 .agent-answer p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
-.workspace-agent { min-width: 0; }
-.workspace-agent .agent-mini { position: sticky; top: 18px; min-height: 520px; align-content: start; gap: 16px; }
 .agent-prompts { display: grid; gap: 6px; }
 .agent-prompts button { padding: 8px 9px; color: var(--secondary); border: 1px solid var(--border); border-radius: 7px; background: transparent; font-size: 13px; text-align: left; }
 .agent-prompts button:hover { color: var(--text-primary); border-color: var(--border-strong); background: var(--accent-subtle); }
@@ -811,9 +722,6 @@ label small {
 .agent-answer small { color: var(--text-secondary); font-size: 13px; line-height: 1.5; }
 .agent-answer.unavailable { padding: 12px; border: 1px solid var(--warning-subtle); border-radius: 8px; background: var(--warning-subtle); }
 .agent-guardrail { margin: auto 0 0; padding-top: 14px; color: var(--muted); border-top: 1px solid var(--border); font-size: 13px; line-height: 1.55; }
-@media (max-width: 1080px) {
-  .workspace-grid { grid-template-columns: minmax(0, 1fr) 270px; }
-}
 @media (max-width: 760px) {
   .overview-metrics, .overview-split { grid-template-columns: 1fr; }
   .overview-card { min-height: 0; }
@@ -830,13 +738,12 @@ input:focus, select:focus { border-color: var(--accent-text); }
 .primary { background: var(--accent-subtle) !important; color: var(--text-primary); border-color: var(--accent-border) !important; }
 .secondary-button { background: var(--elevated); border-color: var(--border-strong); }
 .tertiary { background: transparent; color: var(--secondary); }
-.danger { color: var(--danger); border-color: var(--danger-border); }
 .brand { height: 48px; padding: 0 10px 18px; }
 .page { max-width: 1440px; padding: 42px 44px 32px; }
 .page-heading { align-items: flex-end; margin-bottom: 30px; }
 .page-heading h1 { font-size: clamp(30px, 3vw, 40px); font-weight: 650; }
 .page-heading p { font-size: 14px; }
-.panel, .workspace-main { background: var(--surface); border-color: var(--border); border-radius: 9px; }
+.panel { background: var(--surface); border-color: var(--border); border-radius: 9px; }
 .badge { min-height: 24px; padding: 3px 8px; border-radius: 5px; }
 .evidence-status { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
 .evidence-status > span { color: var(--muted); font-size: 13px; }
@@ -850,16 +757,9 @@ input:focus, select:focus { border-color: var(--accent-text); }
 .chart-empty strong { color: var(--secondary); font-size: 14px; }
 .chart-empty p { max-width: 40ch; }
 .event-row time { font-variant-numeric: tabular-nums; }
-
-.project-actions { align-items: end; }
-.source-picker { display: grid; gap: 5px; color: var(--muted); font-size: 13px; }
-.source-picker select { min-width: 190px; }
-.status-line { border: 1px solid var(--border); background: var(--surface); border-radius: 8px; padding: 10px 12px; }
-.workspace-main { overflow: hidden; }
 .tabs { min-height: 52px; padding: 0 18px; border-bottom: 1px solid var(--border); }
 .tabs button { min-height: 52px; padding: 0 14px; border: 0; border-radius: 0; background: transparent; }
 .tabs button.active { color: var(--text-primary); box-shadow: inset 0 -2px var(--accent); background: transparent; }
-.tab-content { padding: 22px; }
 .metric-chart { border-radius: 8px; background: var(--background); }
 .transition-list > div, .detail-relation { min-height: 46px; border-bottom-color: var(--border); }
 .onboarding { display: block; max-width: none; min-height: 410px; padding: 26px; }
@@ -868,11 +768,8 @@ input:focus, select:focus { border-color: var(--accent-text); }
   .page { padding: 26px 16px; }
   .page-heading { align-items: flex-start; }
   .page-heading > .button { width: 100%; }
-  .project-actions { width: 100%; }
-  .source-picker, .source-picker select, .project-actions .danger { width: 100%; }
   .tabs { overflow-x: auto; padding: 0 8px; }
   .tabs button { white-space: nowrap; }
-  .tab-content { padding: 16px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1078,10 +975,6 @@ input:focus, select:focus { border-color: var(--accent-text); }
   outline-offset: 3px;
 }
 
-@media (max-width: 1220px) {
-  .workspace-grid { grid-template-columns: 1fr; }
-}
-
 @media (max-width: 760px) {
   .twin-legend { justify-content: flex-start; }
   .twin-node { width: 188px; }
@@ -1132,14 +1025,6 @@ h1 {
   line-height: 1.6;
 }
 
-.eyebrow {
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0;
-  text-transform: none;
-}
-
 .primary {
   border-radius: 8px;
   padding: 11px 15px;
@@ -1153,8 +1038,7 @@ h1 {
   font-size: 14px;
 }
 
-.panel,
-.workspace-main {
+.panel {
   border-radius: 8px;
   box-shadow: none;
 }
@@ -1163,19 +1047,9 @@ h1 {
   font-size: 13px;
 }
 
-.back {
-  margin-bottom: 24px;
-}
-
 @media (max-width: 1200px) {
   .page {
     padding: 32px 28px;
-  }
-}
-
-@media (max-width: 900px) {
-  .workspace-grid {
-    grid-template-columns: 1fr;
   }
 }
 
@@ -1199,7 +1073,7 @@ h1 {
 }
 
 /* Final cascade: shared Agentwin dashboard tokens and new workflow layouts. */
-.panel, .workspace-main { background: var(--surface); border-color: var(--border); }
+.panel { background: var(--surface); border-color: var(--border); }
 .onboarding { display: block; grid-template-columns: none; max-width: none; min-height: 410px; padding: 26px; }
 .onboarding > [role="status"] { display: block; width: auto; }
 .view-heading h3 { margin-bottom: 5px; font-size: 17px; }

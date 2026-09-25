@@ -75,9 +75,9 @@ try {
   await page
     .getByRole("button", { name: "Manage project", exact: true })
     .click();
-  await expect(page.getByRole("dialog")).toBeVisible();
+  await expect(page.getByRole("alertdialog")).toBeVisible();
   await page.keyboard.press("Escape");
-  await expect(page.getByRole("dialog")).not.toBeVisible();
+  await expect(page.getByRole("alertdialog")).not.toBeVisible();
   await expect(
     page.getByRole("button", { name: "Manage project", exact: true }),
   ).toBeFocused();
