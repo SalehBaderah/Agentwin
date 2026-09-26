@@ -112,6 +112,30 @@ def test_summaries_are_live_scoped_persisted_and_rescheduled(tmp_path, monkeypat
     store.db.close()
 
 
+def test_next_summary_email_due_uses_schedule_and_configuration(tmp_path, monkeypatch):
+    monkeypatch.setenv('AGENTWIN_EMAIL_TO', 'operator@example.com')
+    monkeypatch.setenv('AGENTWIN_EMAIL_FROM', 'sender@example.com')
+    monkeypatch.setenv('AGENTWIN_SMTP_HOST', '127.0.0.1')
+    store, pid, _ = create_store(tmp_path)
+    slot = store.rows('SELECT next_due FROM summary_schedule WHERE project=?', (pid,))[0]['next_due']
+    state = store.state(pid)
+    assert state['next_summary_email_due'] == slot
+    assert abs(state['server_time'] - time.time()) < 2
+    save_settings(store, pid, summary_interval_minutes=3)
+    new_slot = store.rows('SELECT next_due FROM summary_schedule WHERE project=?', (pid,))[0]['next_due']
+    assert store.state(pid)['next_summary_email_due'] == new_slot != slot
+    save_settings(store, pid, summary_email_enabled=False)
+    assert store.state(pid)['next_summary_email_due'] is None
+    save_settings(store, pid, summary_email_enabled=True)
+    monkeypatch.delenv('AGENTWIN_EMAIL_TO')
+    assert store.state(pid)['next_summary_email_due'] is None
+    save_settings(store, pid, email_to='project@example.com')
+    assert store.state(pid)['next_summary_email_due'] == new_slot
+    monkeypatch.delenv('AGENTWIN_SMTP_HOST')
+    assert store.state(pid)['next_summary_email_due'] is None
+    store.db.close()
+
+
 def test_summary_email_reports_last_live_telemetry_age(tmp_path, monkeypatch):
     monkeypatch.setenv('AGENTWIN_EMAIL_TO', 'operator@example.com')
     store, pid, sid = create_store(tmp_path)

@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { PanelRightClose, Send } from "lucide-react";
+import { CircleCheck, PanelRightClose, Send } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -18,6 +18,51 @@ function WinAvatar({ className }: { className?: string }) {
 }
 
 const prompts = ["What is the current state?", "What changed recently?", "Explain active events", "Which actions are permitted?"];
+const graphemeSegmenter = typeof Intl.Segmenter === "function" ? new Intl.Segmenter(undefined, { granularity: "grapheme" }) : null;
+
+function LetterReveal({ text }: { text: string }) {
+  const block = useRef<HTMLSpanElement>(null);
+  const words = useMemo(() => text.split(/(\s+)/), [text]);
+  useLayoutEffect(() => {
+    const root = block.current;
+    if (!root || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const spans = Array.from(root.querySelectorAll<HTMLElement>(".t-stream-w"));
+    const gap = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--stream-gap")) || 20;
+    spans.forEach((span) => { span.style.transition = "none"; span.classList.remove("is-in"); });
+    void root.offsetWidth;
+    spans.forEach((span) => { span.style.transition = ""; });
+    let timer = 0;
+    const next = (index: number) => {
+      if (index >= spans.length) return;
+      spans[index].classList.add("is-in");
+      timer = window.setTimeout(() => next(index + 1), gap);
+    };
+    next(0);
+    return () => window.clearTimeout(timer);
+  }, [text]);
+  return <span ref={block} className="t-stream" role="text" aria-label={text}>{words.map((word, index) => !word || /^\s+$/.test(word) ? word : <span key={index} className="inline-block whitespace-nowrap" aria-hidden="true">{(graphemeSegmenter ? Array.from(graphemeSegmenter.segment(word), (part) => part.segment) : Array.from(word)).map((letter, letterIndex) => <span key={letterIndex} className="t-stream-w is-in">{letter}</span>)}</span>)}</span>;
+}
+
+function NextEmailCountdown({ state }: { state: State }) {
+  const due = state.next_summary_email_due;
+  const serverTime = Number.isFinite(state.server_time) ? state.server_time : Date.now() / 1000;
+  const [remaining, setRemaining] = useState(() => Math.max(0, Math.ceil((due ?? 0) - serverTime)));
+  useLayoutEffect(() => {
+    if (due == null) return;
+    const initial = Math.max(0, due - serverTime);
+    const started = performance.now();
+    const tick = () => setRemaining(Math.max(0, Math.ceil(initial - (performance.now() - started) / 1000)));
+    tick();
+    const timer = window.setInterval(tick, 1000);
+    return () => window.clearInterval(timer);
+  }, [due, serverTime]);
+  if (due == null) return <span>{state.project.monitoring.summary_enabled && state.project.monitoring.summary_email_enabled ? "Email not configured" : "Email off"}</span>;
+  if (remaining === 0) return <span>Next email due</span>;
+  const hours = Math.floor(remaining / 3600);
+  const minutes = String(Math.floor((remaining % 3600) / 60)).padStart(2, "0");
+  const seconds = String(remaining % 60).padStart(2, "0");
+  return <span className="tabular-nums" title={`Scheduled for ${new Date(due * 1000).toLocaleString()}`}>Next email in {hours ? `${hours}:${minutes}:${seconds}` : `${minutes}:${seconds}`}</span>;
+}
 
 export function AgentPanel({ state, onCollapse }: { state: State; onCollapse?: () => void }) {
   const [question, setQuestion] = useState("");
@@ -49,14 +94,22 @@ export function AgentPanel({ state, onCollapse }: { state: State; onCollapse?: (
             <small className="flex items-center gap-[5px] text-xs text-subtle-foreground capitalize"><i className={cn("size-[7px] rounded-full", state.status === "reporting" ? "bg-success" : "bg-warning")} />{sessionLabel(state.session.mode)} session <span aria-hidden="true">·</span> {state.status}</small>
           </div>
           <section className="grid gap-[9px] rounded-[10px] border border-brand-border bg-brand-subtle p-3" aria-label="Latest scheduled summary">
-            <div className="flex items-center justify-between"><div className="flex items-center gap-2"><Mark className="size-5" /><strong className="text-xs font-bold">Agentwin summary</strong></div><span className="text-[11px] text-subtle-foreground">{state.project.monitoring.summary_interval_minutes} min</span></div>
+            <div className="flex items-center justify-between"><div className="flex items-center gap-2"><Mark className="size-5" /><strong className="text-xs font-bold">Win summary</strong></div><span className="text-[11px] text-subtle-foreground">{state.project.monitoring.summary_interval_minutes} min</span></div>
             {latestSummary ? (
               <>
                 <time className="text-xs text-muted-foreground" dateTime={new Date(latestSummary.period_end * 1000).toISOString()}>{summaryTime(latestSummary.period_end)}</time>
-                <p className="text-[13px]">{latestSummary.body}</p>
-                <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground"><span>{latestSummary.source === "local_model" ? "AI-assisted" : "Evidence summary"} · Email {emailStatus(latestSummary.email_status, state.project.monitoring.summary_email_enabled)}</span><Link className="text-brand hover:underline" to="/events">View in Events</Link></div>
+                <p className="text-[13px]"><LetterReveal key={latestSummary.id} text={latestSummary.body} /></p>
               </>
             ) : <p className="text-xs text-subtle-foreground">{state.project.monitoring.summary_enabled ? "The first live summary will appear after the next interval." : "Summaries are off for this project."}</p>}
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
+              <span className="inline-flex flex-wrap items-center gap-1" aria-live="off">
+                {latestSummary?.source === "local_model" && <>AI-assisted<span aria-hidden="true">·</span></>}
+                {latestSummary?.email_status === "sent" && <CircleCheck className="size-3.5 text-success" role="img" aria-label="Previous summary email sent" />}
+                {latestSummary && !["sent", "not_configured"].includes(latestSummary.email_status) && <span>Previous email {emailStatus(latestSummary.email_status, true)} <span aria-hidden="true">·</span></span>}
+                <NextEmailCountdown state={state} />
+              </span>
+              {latestSummary && <Link className="text-brand hover:underline" to="/events">View in Events</Link>}
+            </div>
           </section>
           <div className="grid gap-2 border-b pb-3.5">
             <span className="text-[11px] font-bold tracking-[0.02em] text-muted-foreground">Suggested questions</span>
@@ -75,7 +128,7 @@ export function AgentPanel({ state, onCollapse }: { state: State; onCollapse?: (
                   <WinAvatar className="size-7" />
                   <div className={cn("ml-8 grid gap-3 rounded-[10px] border p-2.5 text-xs", answer.available ? "bg-muted" : "border-warning-border bg-warning-subtle")}>
                     <span className="block text-[11px] font-bold text-muted-foreground">Win</span>
-                    <div><span className="block text-[11px] font-bold text-muted-foreground">Finding</span><strong className="text-[13px] font-bold">{answer.finding}</strong></div>
+                    <div><span className="block text-[11px] font-bold text-muted-foreground">Finding</span><strong className="text-[13px] font-bold"><LetterReveal text={answer.finding} /></strong></div>
                     {answer.evidence.length > 0 && (
                       <div>
                         <span className="block text-[11px] font-bold text-muted-foreground">Evidence</span>
@@ -88,8 +141,8 @@ export function AgentPanel({ state, onCollapse }: { state: State; onCollapse?: (
                         )}
                       </div>
                     )}
-                    <div><span className="block text-[11px] font-bold text-muted-foreground">Uncertainty</span><p className="text-xs leading-[1.45] text-subtle-foreground">{answer.uncertainty}</p></div>
-                    <div><span className="block text-[11px] font-bold text-muted-foreground">Next step</span><p className="text-xs leading-[1.45] text-subtle-foreground">{answer.next_step}</p></div>
+                    <div><span className="block text-[11px] font-bold text-muted-foreground">Uncertainty</span><p className="text-xs leading-[1.45] text-subtle-foreground"><LetterReveal text={answer.uncertainty} /></p></div>
+                    <div><span className="block text-[11px] font-bold text-muted-foreground">Next step</span><p className="text-xs leading-[1.45] text-subtle-foreground"><LetterReveal text={answer.next_step} /></p></div>
                   </div>
                 </div>
               )}

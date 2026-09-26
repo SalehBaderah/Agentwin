@@ -1,7 +1,7 @@
 import json, os, sqlite3, threading, time, uuid
 from pathlib import Path
 from .models import DeviceCreate, MonitoringSettings, ProjectCreate, Settings, Telemetry
-from .notifications import last_telemetry_label
+from .notifications import last_telemetry_label, smtp_configured
 from .templates import definition, migrate_graph
 
 def uid(): return uuid.uuid4().hex
@@ -351,13 +351,16 @@ class Store:
     def state(self, pid, sid=None):
         project = self.project(pid); active = self.session(pid, sid, mode='live' if sid is None else None); readings = self.history(pid, active['id']); latest = readings[-1] if readings else None
         live = self.session(pid, mode='live')
+        schedule = self.rows('SELECT next_due FROM summary_schedule WHERE project=?', (pid,))
+        monitoring = project['monitoring']
+        next_summary_email_due = schedule[0]['next_due'] if schedule and monitoring['summary_enabled'] and monitoring['summary_email_enabled'] and (monitoring['email_to'] or os.getenv('AGENTWIN_EMAIL_TO')) and smtp_configured() else None
         gateways = self.rows('SELECT * FROM gateways WHERE project=?', (pid,)); online = {row['device'] for row in gateways if row['online'] and time.time() - row['received'] < 10}
         devices = [{'id': device['id'], 'connector': device['connector'], 'online': device['id'] in online, 'reporting': any(row['device'] == device['id'] and time.time()-row['received'] <= project['freshness_seconds'] for row in readings[-20:])} for device in project['devices']]
         field_status = {}
         for key, field in project['graph']['fields'].items():
             observed = next((row for row in reversed(readings) if key in row['readings']), None); limit = field.get('freshness_seconds') or project['freshness_seconds']
             field_status[key] = {'received': observed['received'] if observed else None, 'fresh': bool(observed and time.time()-observed['received'] <= limit), 'device_id': field.get('device_id')}
-        return {'project': project, 'session': {**active, 'provenance': json.loads(active['provenance'])}, 'sessions': self.rows('SELECT * FROM sessions WHERE project=? ORDER BY created DESC', (pid,)), 'latest': latest, 'readings': readings, 'events': self.events(pid, active['id']), 'summaries': self.summaries(pid, live['id']), 'actions': self.rows('SELECT * FROM actions WHERE project=? AND session=? ORDER BY created DESC LIMIT 100', (pid, active['id'])), 'devices': devices, 'field_status': field_status, 'status': 'awaiting data' if not latest else 'stale' if not any(item['fresh'] for item in field_status.values()) else 'reporting', 'gateway_status': 'online' if online else 'unknown', 'agent_config': project['agent']}
+        return {'project': project, 'session': {**active, 'provenance': json.loads(active['provenance'])}, 'sessions': self.rows('SELECT * FROM sessions WHERE project=? ORDER BY created DESC', (pid,)), 'latest': latest, 'readings': readings, 'events': self.events(pid, active['id']), 'summaries': self.summaries(pid, live['id']), 'next_summary_email_due': next_summary_email_due, 'server_time': time.time(), 'actions': self.rows('SELECT * FROM actions WHERE project=? AND session=? ORDER BY created DESC LIMIT 100', (pid, active['id'])), 'devices': devices, 'field_status': field_status, 'status': 'awaiting data' if not latest else 'stale' if not any(item['fresh'] for item in field_status.values()) else 'reporting', 'gateway_status': 'online' if online else 'unknown', 'agent_config': project['agent']}
     def acknowledge(self, pid, sid, eid):
         rows = self.rows('SELECT * FROM events WHERE id=? AND project=? AND session=?', (eid, pid, sid))
         if not rows: raise ValueError('Event not found in this scope')

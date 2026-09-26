@@ -119,6 +119,8 @@ export type State = {
   readings: Reading[];
   events: Event[];
   summaries: Summary[];
+  next_summary_email_due: number | null;
+  server_time: number;
   actions: { id: string; created: number; action: string; target: string; status: string }[];
   devices: { id: string; connector: string; online: boolean; reporting: boolean }[];
   field_status: Record<string, { received: number | null; fresh: boolean; device_id?: string | null }>;

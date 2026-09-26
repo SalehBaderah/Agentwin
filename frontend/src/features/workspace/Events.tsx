@@ -42,7 +42,7 @@ export function Events({ state, refresh }: { state: State; refresh: () => void }
         <SectionHeading level={3} title="Scheduled live summaries" aside="Informational, not open alerts" />
         {state.summaries?.length ? state.summaries.map((summary) => (
           <Card key={summary.id} className="gap-2 p-4">
-            <div className="flex flex-wrap items-baseline justify-between gap-2"><strong className="text-sm font-medium">{summaryTime(summary.period_end)}</strong><small className="text-xs text-muted-foreground">{Math.round((summary.period_end - summary.period_start) / 60)}-minute live window · {summary.source === "local_model" ? "AI-assisted" : "Evidence summary"}</small></div>
+            <div className="flex flex-wrap items-baseline justify-between gap-2"><strong className="text-sm font-medium">{summaryTime(summary.period_end)}</strong><small className="text-xs text-muted-foreground">{Math.round((summary.period_end - summary.period_start) / 60)}-minute live window{summary.source === "local_model" && " · AI-assisted"}</small></div>
             <p className="text-sm">{summary.body}</p>
             <small className="text-xs text-muted-foreground">Email {emailStatus(summary.email_status, state.project.monitoring.summary_email_enabled)}</small>
           </Card>

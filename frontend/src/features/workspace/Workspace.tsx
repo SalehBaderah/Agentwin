@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { Activity, ArrowLeft, Bell, Cable, Database } from "lucide-react";
+import { Activity, ArrowLeft, Bell, Cable, Database, PanelRightOpen } from "lucide-react";
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -175,8 +175,15 @@ export function Workspace({ connected, onContextChange }: { connected: boolean; 
         <aside className={cn("workspace-agent min-w-0", !agentCollapsed && "max-md:fixed max-md:inset-0 max-md:z-40 max-md:flex max-md:items-end")} aria-label="Win project assistant" onKeyDown={(event) => { if (event.key === "Escape" && !agentCollapsed) toggleAgent(); }}>
           {!agentCollapsed && <button type="button" className="absolute inset-0 bg-backdrop md:hidden" aria-label="Close Win" onClick={toggleAgent} />}
           {agentCollapsed && (
-            <Button variant="outline" className="h-auto flex-col gap-2 px-2 py-3 max-md:fixed max-md:right-4 max-md:bottom-4 max-md:z-30 max-md:flex-row max-md:rounded-full" aria-label="Open Win assistant" aria-expanded="false" onClick={toggleAgent}>
-              <img src="/assets/win.webp" alt="" className="size-8 rounded-full" /><strong className="text-xs">Win</strong>
+            <Button variant="outline" className="group relative h-[188px] w-[140px] flex-col items-stretch justify-between gap-2 overflow-hidden rounded-[16px] border-brand-border bg-card p-3 text-left text-foreground shadow-sm hover:border-brand hover:bg-card focus-visible:border-brand dark:border-brand-border dark:bg-card dark:hover:bg-card max-md:fixed max-md:right-4 max-md:bottom-4 max-md:z-30 max-md:h-[72px] max-md:w-[192px] max-md:flex-row max-md:items-center max-md:justify-start max-md:gap-2.5 max-md:rounded-[18px] max-md:p-2 max-md:shadow-lg" aria-label="Open Win assistant" aria-expanded="false" onClick={toggleAgent}>
+              <span className="flex h-[112px] w-full shrink-0 items-center justify-center rounded-[12px] bg-brand-subtle max-md:size-14">
+                <img src="/assets/win.webp" alt="" className="size-[100px] object-contain max-md:size-14" width="100" height="100" decoding="async" />
+              </span>
+              <span className="flex w-full items-center justify-between gap-1 max-md:min-w-0 max-md:flex-1 max-md:flex-col max-md:items-start max-md:gap-0">
+                <strong className="font-heading text-base leading-tight">Win</strong>
+                <span className="text-[11px] font-medium text-muted-foreground max-md:text-[10px]">Open assistant</span>
+              </span>
+              <PanelRightOpen className="absolute top-3 right-3 size-4 text-brand transition-transform group-hover:translate-x-0.5 max-md:static max-md:ml-auto max-md:shrink-0" aria-hidden="true" />
             </Button>
           )}
           <div hidden={agentCollapsed} className="relative max-md:max-h-[88svh] max-md:w-full max-md:overflow-y-auto max-md:rounded-t-[18px] min-[1181px]:sticky min-[1181px]:top-20 min-[1181px]:h-full min-[1181px]:max-h-[calc(100svh-6rem)]">
