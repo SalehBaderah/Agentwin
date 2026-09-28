@@ -1,0 +1,397 @@
+@layer components {
+  .physical-workspace {
+    container-type: inline-size;
+    container-name: physical;
+    min-width: 0;
+  }
+  .physical-device-bar,
+  .physical-profile-bar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 18px;
+    border-bottom: 1px solid var(--border);
+  }
+  .physical-device-bar {
+    justify-content: space-between;
+  }
+  .physical-device-bar h4 {
+    font-size: 14px;
+    font-weight: 650;
+  }
+  .physical-device-bar p {
+    font-size: 12px;
+    margin-top: 4px;
+    color: var(--text-muted);
+  }
+  .physical-device-bar [data-slot="select-trigger"] {
+    width: auto;
+    max-width: 100%;
+    min-width: 160px;
+  }
+  .physical-profile-bar {
+    align-items: flex-end;
+    padding-block: 12px;
+  }
+  .physical-profile-bar label > span {
+    display: block;
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-bottom: 5px;
+  }
+  .physical-profile-bar [data-slot="select-trigger"] {
+    min-width: 210px;
+    max-width: 100%;
+  }
+  .inferred-toggle {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 11px;
+    padding-bottom: 10px;
+    color: var(--text-secondary);
+  }
+  .inferred-toggle input {
+    accent-color: var(--accent);
+  }
+  .physical-workbench {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+  }
+  @container physical (min-width:960px) {
+    .physical-workbench {
+      grid-template-columns: minmax(0, 1fr) clamp(300px, 33%, 380px);
+    }
+    .physical-instruments {
+      border-left: 1px solid var(--border);
+      border-top: 0 !important;
+      max-height: 780px;
+      overflow: auto;
+    }
+  }
+  .hardware-assembly {
+    min-width: 0;
+  }
+  .assembly-heading {
+    display: flex;
+    justify-content: space-between;
+    padding: 15px 18px;
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+  .assembly-heading span:first-child {
+    font-weight: 600;
+    color: var(--text-secondary);
+  }
+  .assembly-canvas {
+    height: 480px;
+    position: relative;
+    overflow: hidden;
+    touch-action: none;
+  }
+  .assembly-canvas .physical-svg {
+    height: 100%;
+    width: 100%;
+  }
+  .assembly-labels {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+  }
+  .assembly-label {
+    position: absolute;
+    pointer-events: auto;
+    width: 148px;
+    padding: 6px 8px;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    background: var(--glass);
+    color: var(--text-primary);
+    text-align: left;
+    line-height: 1.4;
+  }
+  .assembly-label strong {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .assembly-label span {
+    display: block;
+    font-size: 10px;
+    color: var(--text-muted);
+  }
+  .assembly-label.is-selected {
+    border-color: var(--accent-border);
+  }
+  .assembly-mobile-labels {
+    display: none;
+  }
+  @container physical (max-width:600px) {
+    .assembly-labels {
+      display: none;
+    }
+    .assembly-mobile-labels {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      padding: 12px;
+    }
+    .assembly-mobile-labels button {
+      min-width: 0;
+      text-align: left;
+      padding: 8px;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+    }
+    .assembly-mobile-labels button[aria-pressed="true"] {
+      border-color: var(--accent-border);
+      background: var(--accent-subtle);
+    }
+    .assembly-mobile-labels strong,
+    .assembly-mobile-labels span {
+      display: block;
+      overflow-wrap: anywhere;
+      font-size: 11px;
+    }
+    .assembly-mobile-labels span {
+      color: var(--text-muted);
+      font-size: 10px;
+      margin-top: 4px;
+    }
+  }
+  .assembly-tools {
+    position: absolute;
+    left: 14px;
+    bottom: 14px;
+    display: flex;
+    gap: 2px;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    background: var(--glass);
+    padding: 3px;
+  }
+  .assembly-wiring [tabindex]:focus-visible {
+    outline: 2px solid var(--accent-text);
+  }
+  .assembly-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    padding: 12px 18px;
+    border-top: 1px solid var(--border);
+    font-size: 10px;
+    text-transform: capitalize;
+    color: var(--text-secondary);
+  }
+  .assembly-legend span {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .assembly-legend i {
+    width: 14px;
+    height: 2px;
+  }
+  .assembly-explanation {
+    min-height: 48px;
+    padding: 0 18px 14px;
+    font-size: 11px;
+    line-height: 1.6;
+    color: var(--text-muted);
+  }
+  .physical-instruments {
+    min-width: 0;
+    padding: 18px;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+  }
+  .instrument-device {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid var(--border);
+  }
+  .instrument-device strong {
+    display: block;
+    font-size: 12px;
+    overflow-wrap: anywhere;
+  }
+  .instrument-device span {
+    display: block;
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-top: 4px;
+  }
+  .instrument-selection {
+    padding: 16px 0;
+  }
+  .instrument-selection > span {
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+  .instrument-selection h4 {
+    font-size: 18px;
+    margin: 5px 0 10px;
+    font-weight: 650;
+  }
+  .evidence-label {
+    display: inline-block;
+    color: var(--text-secondary);
+    background: var(--surface-elevated);
+    padding: 4px 8px;
+    border-radius: 5px;
+    font-size: 11px;
+  }
+  .instrument-selection p {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    color: var(--text-muted);
+    font-size: 10px;
+    margin-top: 9px;
+  }
+  .instrument-browser,
+  .instrument-evidence {
+    border-block: 1px solid var(--border);
+    padding: 12px 0;
+    font-size: 11px;
+  }
+  .instrument-browser summary {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+  }
+  .instrument-browser input {
+    margin-top: 10px;
+  }
+  .instrument-browser > div {
+    max-height: 210px;
+    overflow: auto;
+    margin-top: 8px;
+  }
+  .instrument-browser button {
+    display: flex;
+    width: 100%;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 9px 7px;
+    text-align: left;
+    border-radius: 5px;
+  }
+  .instrument-browser button[aria-pressed="true"] {
+    background: var(--accent-subtle);
+    color: var(--accent-text);
+  }
+  .instrument-browser small {
+    color: var(--text-muted);
+    max-width: 45%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .instrument-readings {
+    display: grid;
+    gap: 22px;
+    padding-top: 18px;
+  }
+  .instrument-readings article {
+    padding-bottom: 18px;
+    border-bottom: 1px solid var(--border);
+  }
+  .instrument-readings [data-slot="chart"] {
+    height: 170px;
+  }
+  .instrument-readings article > div {
+    margin-top: 14px;
+    margin-bottom: 14px;
+  }
+  .instrument-readings article strong.text-3xl {
+    font-size: 26px;
+  }
+  .instrument-controls {
+    margin-top: 14px;
+  }
+  .instrument-controls .control-card {
+    padding: 12px;
+    box-shadow: none;
+  }
+  .instrument-controls .control-state {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+  .instrument-controls h3 {
+    font-size: 13px;
+  }
+  .instrument-controls p {
+    font-size: 11px;
+  }
+  .instrument-evidence {
+    margin-top: 16px;
+    line-height: 1.7;
+  }
+  .instrument-evidence summary {
+    cursor: pointer;
+    font-weight: 600;
+  }
+  .instrument-evidence a {
+    color: var(--accent-link);
+    text-decoration: underline;
+  }
+  .physical-mobile-details {
+    display: none;
+  }
+  @media (max-width: 760px) {
+    .physical-mobile-details {
+      display: flex;
+      margin-top: 14px;
+    }
+  }
+  @container physical (max-width:480px) {
+    .physical-device-bar,
+    .physical-profile-bar {
+      padding: 12px;
+    }
+    .physical-device-bar [data-slot="select-trigger"],
+    .physical-profile-bar label:first-child {
+      width: 100%;
+    }
+    .assembly-canvas {
+      height: 380px;
+    }
+    .assembly-label {
+      width: 112px;
+    }
+    .assembly-label strong {
+      font-size: 10px;
+    }
+    .assembly-label span {
+      font-size: 9px;
+    }
+  }
+  .is-physical.twin-view-frame {
+    min-height: 0;
+    height: auto;
+  }
+  .is-physical .live-twin-stage {
+    display: block;
+    height: auto;
+  }
+}
+/* Scoped overrides of shared utility sizes inside the compact instrument column. */
+.physical-workspace .instrument-readings [data-slot="chart"] {
+  height: 170px;
+}
+.physical-workspace .instrument-controls .control-state {
+  grid-template-columns: 1fr;
+}
+.physical-workspace .instrument-controls .control-card {
+  padding: 12px;
+  box-shadow: none;
+}

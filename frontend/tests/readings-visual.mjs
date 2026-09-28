@@ -17,6 +17,12 @@ try {
       await page.getByRole('option', { name: metric.label, exact: true }).click();
       const card = page.getByRole('article', { name: `${metric.label} reading`, exact: true });
       await expect(card).toBeVisible();
+      if (metric.data_type === 'boolean' && state.readings.some(r => typeof r.readings[key] === 'boolean')) {
+        await expect(card.getByRole('heading', {name:'State timeline',exact:true})).toBeVisible();
+        await expect(card.locator('.recharts-wrapper')).toHaveCount(0);
+        await card.getByRole('combobox',{name:'State history window'}).selectOption('all');
+        await card.getByRole('combobox',{name:'State history window'}).selectOption('recent');
+      }
       if (metric.data_type === 'categorical' && state.readings.some(r => typeof r.readings[key] === 'string')) await expect(card.getByText('State distribution', { exact: true })).toBeVisible();
     }
   }

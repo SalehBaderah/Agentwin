@@ -11,8 +11,9 @@ import { metricValue, sessionLabel } from "@/lib/format";
 import type { State } from "@/types";
 import { time } from "@/types";
 import { readingModel } from "./readingModel";
+import { StateTimeline } from "./StateTimeline";
 
-export function ReadingCard({ state, field, embedded = false }: { state: State; field: string; embedded?: boolean }) {
+export function ReadingCard({ state, field, embedded = false, categoricalView = "distribution" }: { state: State; field: string; embedded?: boolean; categoricalView?: "distribution" | "timeline" }) {
   const [limit, setLimit] = useState(5);
   const metric = state.project.graph.fields[field];
   const model = readingModel(state, field);
@@ -21,7 +22,7 @@ export function ReadingCard({ state, field, embedded = false }: { state: State; 
   // Legacy field metadata can declare zero precision for fractional sensors.
   const precision = Math.max(metric.precision, numbers.some(value => !Number.isInteger(value)) ? 3 : 0);
   const format = (value: unknown) => metricValue(value, precision);
-  const color = kind === "state" ? "var(--chart-1)" : "var(--chart-2)";
+  const color = "var(--chart-2)";
   return <article className={embedded ? "min-w-0" : "min-w-0 rounded-2xl border bg-card p-5 shadow-sm sm:p-6"} aria-label={`${metric.label} reading`}>
     <header className="flex flex-wrap items-start justify-between gap-3">
       <div><h4 className="text-sm font-semibold break-words">{metric.label}</h4><p className="mt-1 text-xs text-muted-foreground">{kind === "state" ? "State history" : kind === "category" ? "Reported state" : kind === "count" ? "Count history" : "Sensor history"}{metric.unit ? ` · ${metric.unit}` : ""}</p></div>
@@ -31,7 +32,7 @@ export function ReadingCard({ state, field, embedded = false }: { state: State; 
       <div className="min-w-0"><strong className="font-heading text-3xl font-semibold tracking-tight break-words tabular-nums">{format(latest?.readings[field])}</strong>{latest && metric.unit && <span className="ml-2 text-sm text-muted-foreground">{metric.unit}</span>}</div>
       <span className="text-xs text-muted-foreground" title={latest ? new Date(latest.received * 1000).toLocaleString() : undefined}>{latest ? `${fresh ? "Received" : "Last known"} ${time(latest.received)}` : "Awaiting telemetry"}</span>
     </div>
-    {latest ? kind === "category" ? <section className="border-t pt-5" aria-label={`${metric.label} distribution`}>
+    {latest ? (kind === "state" || kind === "category" && categoricalView === "timeline") ? <StateTimeline state={state} field={field} /> : kind === "category" ? <section className="border-t pt-5" aria-label={`${metric.label} distribution`}>
       <div className="mb-5 flex flex-wrap items-baseline justify-between gap-2"><h5 className="text-xs font-medium">State distribution</h5><span className="text-[11px] text-muted-foreground">Share of {model.count} reported samples</span></div>
       <div className="max-h-64 space-y-5 overflow-y-auto pr-1">
         {model.categories.map((category, index) => <div key={category.label}>
@@ -45,9 +46,9 @@ export function ReadingCard({ state, field, embedded = false }: { state: State; 
       <ComposedChart accessibilityLayer data={rows} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
         <CartesianGrid vertical={false} strokeDasharray="3 5" />
         <XAxis dataKey="received" type="number" domain={["dataMin", "dataMax"]} tickFormatter={value => time(Number(value))} tickLine={false} axisLine={false} minTickGap={65} />
-        <YAxis width={48} tickLine={false} axisLine={false} domain={range ?? (kind === "count" ? [0, "auto"] : ["auto", "auto"])} ticks={kind === "state" ? [0, 1] : undefined} allowDecimals={kind !== "count"} tickFormatter={value => kind === "state" ? value ? "On" : "Off" : Number(value).toLocaleString("en-US", { maximumSignificantDigits: 3 })} />
-        <ChartTooltip content={<ChartTooltipContent labelFormatter={(_, payload) => time(Number(payload?.[0]?.payload?.received))} formatter={value => <><span className="text-muted-foreground">{metric.label}</span><strong className="ml-auto tabular-nums">{kind === "state" ? Number(value) ? "On" : "Off" : format(value)} {metric.unit}</strong></>} />} />
-        {kind === "count" ? <Bar dataKey="value" fill={color} radius={[3, 3, 0, 0]} maxBarSize={24} isAnimationActive={false} /> : <Area dataKey="value" type={kind === "state" ? "stepAfter" : "linear"} stroke={color} fill={color} fillOpacity={0.08} strokeWidth={2} dot={{ r: 2, strokeWidth: 0 }} activeDot={{ r: 4 }} connectNulls={false} isAnimationActive={false} />}
+        <YAxis width={48} tickLine={false} axisLine={false} domain={range ?? (kind === "count" ? [0, "auto"] : ["auto", "auto"])} allowDecimals={kind !== "count"} tickFormatter={value => Number(value).toLocaleString("en-US", { maximumSignificantDigits: 3 })} />
+        <ChartTooltip content={<ChartTooltipContent labelFormatter={(_, payload) => time(Number(payload?.[0]?.payload?.received))} formatter={value => <><span className="text-muted-foreground">{metric.label}</span><strong className="ml-auto tabular-nums">{format(value)} {metric.unit}</strong></>} />} />
+        {kind === "count" ? <Bar dataKey="value" fill={color} radius={[3, 3, 0, 0]} maxBarSize={24} isAnimationActive={false} /> : <Area dataKey="value" type="linear" stroke={color} fill={color} fillOpacity={0.08} strokeWidth={2} dot={{ r: 2, strokeWidth: 0 }} activeDot={{ r: 4 }} connectNulls={false} isAnimationActive={false} />}
       </ComposedChart>
     </ChartContainer> : <EmptyState className="h-56 justify-center border-0" icon={<Activity />} title="No readings in this session"><p>This field appears when the selected source reports it.</p></EmptyState>}
     {numbers.length > 0 && kind === "continuous" && <dl className="mt-5 grid grid-cols-3 gap-3 border-t pt-4 text-xs">{[["Min", Math.min(...numbers)], ["Sample average", numbers.reduce((sum, n) => sum + n, 0) / numbers.length], ["Max", Math.max(...numbers)]].map(([label, value]) => <div key={label}><dt className="text-muted-foreground">{label}</dt><dd className="mt-1 font-semibold tabular-nums">{format(value)} {metric.unit}</dd></div>)}</dl>}

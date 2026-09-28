@@ -19,6 +19,7 @@ try {
   await page.reload();
   await expect(page.locator('.physical-svg')).toHaveAttribute('viewBox',zoomed);
   await page.getByRole('button',{name:'Fit view',exact:true}).click();
+  await page.locator('.instrument-browser summary').click();
   await page.getByRole('textbox',{name:'Find component'}).fill('no-such-component');
   await expect(page.getByText('No matching components',{exact:true})).toBeVisible();
   await page.getByRole('textbox',{name:'Find component'}).fill('');

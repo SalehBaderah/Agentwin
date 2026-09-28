@@ -15,7 +15,7 @@ import { TwinInspector } from "./TwinInspector";
 import "./live-twin.css";
 
 const TopologyTwin = lazy(() => import("./topology/TopologyTwin").then((module) => ({ default: module.TopologyTwin })));
-const PhysicalTwin = lazy(() => import("./view2d/PhysicalTwin").then((module) => ({ default: module.PhysicalTwin })));
+const PhysicalWorkspace = lazy(() => import("./physical/PhysicalWorkspace").then((module) => ({ default: module.PhysicalWorkspace })));
 const DataFlowTwin = lazy(() => import("./view2d/DataFlowTwin").then((module) => ({ default: module.DataFlowTwin })));
 
 type View = "physical" | "topology" | "flow";
@@ -94,19 +94,19 @@ export function DigitalTwin({ state, selectedId, onSelect, refresh }: { state: S
       <span><Cable />{state.session.mode} session · {time(state.session.created)}</span>
       <span><CircleAlert />{twin.openEvents} open events</span>
     </div>
-    <div className="flex flex-wrap items-center gap-2 border-b p-3">
+    {view !== "physical" && <div className="flex flex-wrap items-center gap-2 border-b p-3">
       <Input className="w-full sm:w-48" aria-label="Find component" placeholder="Find component or pin…" value={query} onChange={e => setQuery(e.target.value)} />
       <OptionSelect className="w-full sm:w-40" aria-label="Filter device" value={deviceFilter} onValueChange={setDeviceFilter} options={[{value:"all",label:"All devices"}, ...twin.devices.map(d => ({value:d.id,label:d.id})), {value:"unassigned",label:"Unassigned"}]} />
       <OptionSelect className="w-full sm:w-48" aria-label="Select component" value={selected.id} onValueChange={choose} options={matches.map(c => ({value:c.id,label:c.label}))} />
       <Button variant="outline" onClick={() => window.dispatchEvent(new CustomEvent("agentwin-focus-component", { detail: selected.id }))}>Focus selected</Button>
       <span className="text-xs text-muted-foreground">{matches.length} components</span>
-    </div>
+    </div>}
     <div className={`twin-view-frame is-${view}`}>
       <div className={`live-twin-stage ${inspectorOpen ? "inspector-open" : ""}`}>
         <Suspense fallback={<EmptyState icon={<Activity />} title={`Loading ${view === "physical" ? "hardware" : view === "flow" ? "data paths" : "topology"}`} className="h-full justify-center rounded-none border-0"><p>Preparing the view.</p></EmptyState>}>
-          {!matches.length ? <EmptyState title="No matching components"><p>Clear the search or select another device.</p></EmptyState> : view === "physical" ? <PhysicalTwin twin={filteredTwin} selectedId={selected.id} onSelect={choose}/> : view === "flow" ? <DataFlowTwin twin={filteredTwin} selectedId={selected.id} onSelect={choose}/> : <TopologyTwin key={state.project.id} twin={filteredTwin} selectedId={selected.id} onSelect={choose}/>}
+          {view === "physical" ? <PhysicalWorkspace twin={twin} selectedId={selected.id} onSelect={onSelect} onInspect={choose} refresh={refresh}/> : !matches.length ? <EmptyState title="No matching components"><p>Clear the search or select another device.</p></EmptyState> : view === "flow" ? <DataFlowTwin twin={filteredTwin} selectedId={selected.id} onSelect={choose}/> : <TopologyTwin key={state.project.id} twin={filteredTwin} selectedId={selected.id} onSelect={choose}/>}
         </Suspense>
-        {!mobile && <TwinInspector component={selected} state={state} refresh={refresh} open={inspectorOpen} onClose={() => setInspectorOpen(false)}/>}
+        {!mobile && view !== "physical" && <TwinInspector component={selected} state={state} refresh={refresh} open={inspectorOpen} onClose={() => setInspectorOpen(false)}/>}
         {mobile && <Sheet open={inspectorOpen} onOpenChange={setInspectorOpen}><SheetContent onCloseAutoFocus={event => { event.preventDefault(); if (inspectorOpener.current?.isConnected) inspectorOpener.current.focus(); }} side="bottom" showCloseButton={false} className="max-h-[85dvh] overflow-auto p-0"><SheetTitle className="sr-only">Component inspector</SheetTitle><TwinInspector component={selected} state={state} refresh={refresh} open={inspectorOpen} onClose={() => setInspectorOpen(false)}/></SheetContent></Sheet>}
       </div>
     </div>

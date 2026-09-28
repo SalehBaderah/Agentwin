@@ -16,6 +16,15 @@ try {
     await expect(canvas).not.toHaveAttribute('viewBox', before);
     await page.waitForTimeout(300);
     expect(await page.evaluate(() => window.scrollY)).toBe(scroll);
+    if(name==='Physical 2D'){
+      await page.getByRole('button',{name:'Fit view',exact:true}).click();
+      await page.locator('.assembly-label').first().hover();
+      const labelScroll=await page.evaluate(()=>window.scrollY);
+      const labelBox=await canvas.getAttribute('viewBox');
+      await page.mouse.wheel(0,-100);
+      await expect(canvas).not.toHaveAttribute('viewBox',labelBox);
+      expect(await page.evaluate(()=>window.scrollY)).toBe(labelScroll);
+    }
   }
   await page.mouse.move(1400, 300);
   const before = await page.evaluate(() => window.scrollY);
