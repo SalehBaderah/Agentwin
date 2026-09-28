@@ -31,8 +31,8 @@ try {
     { component_id: 'led', component_type: 'led', label: 'Built-in LED', device_id: 'uno-d13-review', pin: 'D13', field_key: 'led_on', field_type: 'boolean' },
   ] });
   await open(uno);
-  await page.locator('.physical-svg .board-logo', { hasText: 'UNO' }).waitFor();
-  await page.locator('.physical-svg').getByText('D13 · onboard LED').waitFor();
+  await page.locator('.physical-svg .board-logo', { hasText: 'DEVICE' }).waitFor();
+  await page.locator('.physical-svg').getByText('Built-in LED', { exact: true }).waitFor();
   await page.waitForTimeout(350);
   await page.screenshot({ path: join(artifacts, 'twin-2d-review.png'), fullPage: true });
   await page.locator('.physical-svg g[aria-label^="Built-in LED,"]').click();
@@ -56,7 +56,7 @@ try {
     { component_id: 'jamming-probability', component_type: 'readonly', label: 'Jamming probability', device_id: 'r4-rf-review', field_key: 'jamming_probability' },
   ] });
   await open(r4);
-  await page.locator('.physical-svg').getByText('R4 WiFi').waitFor();
+  await page.locator('.physical-svg').getByText('DEVICE', { exact: true }).waitFor();
   await page.locator('.physical-svg').getByText('A5').first().waitFor();
   await page.getByRole('tab', { name: 'Data Flow' }).click();
   await page.locator('.flow-node', { hasText: 'Rolling mean' }).waitFor();

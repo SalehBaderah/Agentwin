@@ -120,3 +120,39 @@
   .twin-view-frame { animation: none; }
 }
 }
+/* Shared semantic canvas palette; board artwork retains its physical material colors. */
+@layer components {
+.physical-view, .flow-view { background: var(--background); }
+.twin2d-caption { text-shadow: none; background: var(--glass); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; }
+.twin2d-caption strong { color: var(--text-primary); }
+.twin2d-caption span, .twin2d-hint { color: var(--text-secondary); }
+.physical-device-title, .physical-label-title, .physical-field text, .flow-node-name, .flow-node-mark { fill: var(--text-primary); }
+.physical-device-meta, .physical-path-label, .physical-label-value, .physical-field .physical-field-value, .flow-column-label, .flow-node-subtitle { fill: var(--text-secondary); }
+.physical-label-title.is-active { fill: var(--accent-text); }
+.physical-label-value.fresh { fill: var(--operational-cyan); }
+.physical-label-value.aging, .physical-label-value.stale, .physical-pin-callout { fill: var(--warning); }
+.physical-field rect, .flow-node .flow-node-ring { fill: var(--surface); stroke: var(--border-strong); }
+.flow-node .flow-node-core { fill: var(--surface-elevated); stroke: var(--border-strong); }
+.flow-node.is-active .flow-node-ring, .physical-field.is-active rect { stroke: var(--accent-text); }
+.flow-node.fresh .flow-node-ring { stroke: var(--operational-cyan); }
+.flow-node.stale .flow-node-ring, .flow-node.aging .flow-node-ring { stroke: var(--warning); }
+.flow-connection .flow-base { stroke: var(--accent-text); opacity: .8; }
+.flow-connection .flow-active { stroke: var(--operational-cyan); }
+.flow-connection.is-inferred .flow-base { stroke-dasharray: 6 6; opacity: .5; }
+.flow-connection.is-inferred .flow-active { opacity: 0; }
+.physical-wire { fill: none; stroke: var(--operational-cyan); stroke-width: 2; stroke-linecap: round; }
+.physical-wire.is-inferred { stroke: var(--text-muted); stroke-dasharray: 6 6; }
+.physical-wire.is-selected { stroke: var(--accent-text); stroke-width: 3; }
+.physical-label:focus-visible, .flow-node:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 4px; }
+.twin-node > strong { color: var(--accent-text); }
+[data-slot="sheet-content"] .live-twin-inspector { position: relative; display: block; height: auto; max-height: none; border: 0; box-shadow: none; }
+.twin2d-hint { max-width: 55%; text-align: right; padding: 4px; background: var(--glass); }
+}
+@layer components {
+.flow-node-name { font-size: 17px; }
+.flow-node-subtitle { font-size: 12px; }
+.physical-label-title { paint-order: stroke; stroke: var(--background); stroke-width: 3px; stroke-linejoin: round; }
+.physical-field text { font-size: 11px; }
+.physical-part { filter: drop-shadow(0 4px 4px var(--shadow-color)); }
+.physical-wire { stroke-linejoin: round; }
+}

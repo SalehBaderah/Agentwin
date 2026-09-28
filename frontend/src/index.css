@@ -9,6 +9,64 @@
 
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
+/* Light controls use opaque states so contrast does not depend on the surface below. */
+:root[data-theme="light"] [data-slot="button"][data-variant="default"]:hover {
+  background: var(--accent-hover);
+}
+:root[data-theme="light"] [data-slot="button"][data-variant="default"]:active {
+  background: var(--accent-pressed);
+}
+:root[data-theme="light"] :is([data-slot="input"], [data-slot="textarea"], [data-slot="select-trigger"]) {
+  background: var(--surface);
+  border-color: var(--border-strong);
+}
+:root[data-theme="light"] :is([data-slot="input"], [data-slot="textarea"], [data-slot="select-trigger"]):hover:not(:disabled) {
+  border-color: var(--accent-text);
+}
+:root[data-theme="light"] [data-slot="button"][data-variant="outline"] {
+  background: var(--surface);
+  border-color: var(--border-strong);
+}
+:root[data-theme="light"] [data-slot="button"][data-variant="outline"]:hover,
+:root[data-theme="light"] [data-slot="button"][data-variant="secondary"]:hover {
+  background: var(--surface-hover);
+}
+:root[data-theme="light"] :is([data-slot="button"][data-variant="outline"], [data-slot="button"][data-variant="secondary"], [data-slot="button"][data-variant="ghost"]):active {
+  background: var(--accent-subtle);
+  color: var(--accent-text);
+}
+:root[data-theme="light"] :is(button, a, input, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--accent-text);
+  outline-offset: 3px;
+}
+:root[data-theme="light"] [data-slot="tabs-trigger"] {
+  color: var(--text-secondary);
+}
+:root[data-theme="light"] [data-slot="tabs-trigger"]:is([data-state="active"], [data-active]) {
+  color: var(--accent-text);
+  font-weight: 600;
+}
+:root[data-theme="light"] :is([data-slot="select-item"], [data-slot="dropdown-menu-item"]):is([data-highlighted], [data-state="checked"]),
+:root[data-theme="light"] [cmdk-item][data-selected="true"] {
+  background: var(--accent-subtle);
+  color: var(--accent-text);
+}
+:root[data-theme="light"] [data-slot="chart"] .recharts-cartesian-grid line {
+  stroke: var(--chart-grid);
+}
+:root[data-theme="light"] [data-slot="chart"] .recharts-cartesian-axis-tick text {
+  fill: var(--text-secondary);
+}
+:root[data-theme="light"] [data-slot="chart"] .recharts-tooltip-cursor {
+  stroke: var(--border-strong);
+}
+:root[data-theme="light"] .recharts-tooltip-wrapper > div {
+  background: var(--surface);
+  border-color: var(--border-strong);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-panel);
+}
+
 /* shadcn variable names that do not collide with tokens.css. */
 :root {
   --foreground: var(--text-primary);

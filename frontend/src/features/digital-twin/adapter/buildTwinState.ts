@@ -26,13 +26,12 @@ function freshness(ageMs: number | undefined, limitSeconds: number): TwinFreshne
   if (ageMs === undefined) return "unavailable";
   if (ageMs <= limitSeconds * 650) return "fresh";
   if (ageMs <= limitSeconds * 1000) return "aging";
-  if (ageMs <= limitSeconds * 3000) return "stale";
-  return "unavailable";
+  return "stale";
 }
 
 function readingFor(readings: Reading[], field: string, deviceId?: string | null) {
   for (let index = readings.length - 1; index >= 0; index -= 1) {
-    if ((!deviceId || readings[index].device === deviceId) && Object.hasOwn(readings[index].readings, field)) return readings[index];
+    if ((!deviceId || readings[index].device === deviceId) && Object.hasOwn(readings[index].readings, field) && readings[index].readings[field] !== null) return readings[index];
   }
   return undefined;
 }
@@ -122,14 +121,13 @@ export function buildTwinState(state: State, nowMs: number): TwinState {
     const deviceReading = deviceId ? readings.filter((item) => item.device === deviceId).at(-1) : undefined;
     const reportsDevice = role === "controller" || role === "gateway" || role === "transport";
     const relatedEvents = state.events.filter((event) =>
-      event.evidence.readings.some((reading) => componentFields.some(([key]) => Object.hasOwn(reading.readings, key))),
+      event.evidence.field_key ? componentFields.some(([key]) => key === event.evidence.field_key) : event.evidence.device_id ? componentFields.some(([, metric]) => metric.device_id === event.evidence.device_id) : event.evidence.readings.some((reading) => componentFields.some(([key]) => Object.hasOwn(reading.readings, key))),
     );
     const componentFreshness = metrics.length ? worstFreshness(metrics.map((metric) => metric.freshness)) : reportsDevice && deviceId ? deviceFreshness(deviceId) : "unavailable";
     const reported = metrics.some((metric) => metric.receivedAt !== undefined) || Boolean(reportsDevice && deviceReading);
     const device = state.project.devices.find((item) => item.id === deviceId);
     const declaredVisual = component.visual?.model || component.configuration.board || component.configuration.model;
-    const boardHint = `${state.project.name} ${deviceId || ""}`.toLowerCase();
-    const visualKey = String(declaredVisual || (role === "controller" && /\br4\b|[_-]r4(?:[_-]|$)/.test(boardHint) ? "uno-r4" : role === "controller" && /arduino[_\s-]*uno|\buno[_\s-]/.test(boardHint) ? "arduino-uno" : component.type)).toLowerCase();
+    const visualKey = String(declaredVisual || component.type).toLowerCase();
     return {
       id: component.id,
       type: role,
