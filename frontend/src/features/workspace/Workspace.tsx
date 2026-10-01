@@ -24,9 +24,10 @@ import { ControlsPanel } from "./ControlsPanel";
 import { Events } from "./Events";
 import { ProjectOverview } from "./ProjectOverview";
 import { Readings } from "./Readings";
+import { FirmwareSetup } from "@/features/projects/FirmwareSetup";
 
 const DigitalTwin = lazy(() => import("@/features/digital-twin/DigitalTwin").then((module) => ({ default: module.DigitalTwin })));
-const tabs: [string, string][] = [["overview", "Overview"], ["readings", "Live readings"], ["twin", "Digital twin"], ["events", "Events & history"], ["controls", "Controls"]];
+const tabs: [string, string][] = [["overview", "Overview"], ["readings", "Live readings"], ["twin", "Digital twin"], ["events", "Events & history"], ["controls", "Controls"], ["setup", "Device setup"]];
 const mobileQuery = "(max-width: 760px)";
 
 export function Workspace({ connected, onContextChange }: { connected: boolean; onContextChange: (context: ProjectContext) => void }) {
@@ -169,6 +170,7 @@ export function Workspace({ connected, onContextChange }: { connected: boolean; 
             </TabsContent>
             <TabsContent value="events" className={panelClass("events")}><Events state={state} refresh={refresh} /></TabsContent>
             <TabsContent value="controls" className={panelClass("controls")}><ControlsPanel state={state} refresh={refresh} /></TabsContent>
+            <TabsContent value="setup" className={panelClass("setup")}><FirmwareSetup project={p} state={state} connected={connected} /></TabsContent>
           </Tabs>
         </section>
         {!agentCollapsed && <button type="button" className="relative hidden cursor-col-resize after:absolute after:inset-y-0 after:left-1/2 after:w-px after:bg-border after:transition-colors hover:after:bg-brand focus-visible:outline-none focus-visible:after:w-0.5 focus-visible:after:bg-brand min-[1181px]:block" aria-label="Resize agent panel" title="Drag to resize; use arrow keys; double-click to reset" onPointerDown={startAgentResize} onKeyDown={nudgeAgentWidth} onDoubleClick={() => { setAgentWidth(380); localStorage.setItem("agentwin-agent-width", "380"); }} />}

@@ -11,6 +11,111 @@ Two physical projects share one backend and MQTT broker:
 
 COM ports, project IDs, and LAN IPs can change. Confirm them on your machine. Use each project's **Live** session for physical readings; simulation is separate.
 
+## Hardware and project workflows
+
+Agentwin has two workflows: developers add support for hardware once, then
+operators create projects from that reusable **Hardware Template**. Choose
+supported hardware, configure the device, deploy its Agentwin firmware package,
+and bring it into the same operational workspace.
+
+### Choose a project setup method
+
+**Add Project** offers two setup methods. **Supported hardware** is the simpler
+path; **Custom configuration** gives you control over the devices and fields.
+
+| Aspect | Supported hardware | Custom configuration |
+| --- | --- | --- |
+| Setup | Choose an existing Hardware Template; its components, pins, fields, units and transport are supplied | Define devices, components, pins and telemetry fields yourself |
+| Firmware | Download a matching package with this project's project/device IDs, then build and upload locally | Supply firmware that matches the configuration you define |
+| Devices | One device per project | One or multiple devices per project |
+| Hardware | Currently classic UNO D13 LED and R4 RF Jamming Detector | Hardware you implement and configure using supported component/field types |
+
+Both methods use the same operational workspace and Live telemetry checks.
+Choose **Supported hardware** for the two included hardware setups. Choose
+**Custom configuration** for a sensor without a Hardware Template or a
+multi-device assembly; it does not automatically generate a sensor driver.
+
+### 1. Developer workflow: add support for new hardware
+
+Use this workflow when the board/sensor combination does not yet have a Hardware
+Template. For example, adding an UNO temperature sensor requires its actual
+sensor model, driver, libraries and wiring; a temperature field alone does not
+implement sensor support.
+
+1. Create a firmware project under `firmware/projects/`. Keep the sketch folder
+   and main `.ino` filename identical. Implement a hardware driver with
+   `begin()` and `appendReadings()`, reusing Agentwin's telemetry and transport
+   libraries.
+2. Add a JSON manifest under `firmware/templates/`. Define a unique template ID,
+   version, name, board/FQBN, public firmware files, required libraries, transport,
+   timing defaults and exact component/field contracts. A temperature reading
+   might use `temperature_c`, type `number`, unit `°C` and the actual configured
+   sensor pin.
+3. Add the referenced `.h.tpl` configuration header. Agentwin substitutes
+   `$project_id`, `$device_id` and `$interval_ms` when exporting a package.
+   Hardware-specific behavior remains in the driver/configuration header.
+4. Set the optional `visual_profile` to suggest the Digital Twin's 2D board
+   artwork, such as `arduino-uno-r3`. Artwork, pins and transport are configured
+   metadata, not hardware detection or independently verified physical wiring.
+   Unknown profiles fall back to generic artwork; browser overrides remain
+   available.
+5. Compile, test the contract/package and validate the real hardware. Restart
+   the backend to reload the manifest registry. The Hardware Template then
+   appears in **Add Project** and **Device setup** without frontend dropdown edits.
+
+Start from the [existing UNO Hardware Template](firmware/templates/arduino_uno_d13_led.json)
+and follow the [Hardware Template development guide](docs/hardware-templates.md).
+The user-facing term is **Hardware Template**; recipe/manifest describe its
+internal implementation.
+
+### 2. Project workflow: use supported hardware
+
+Use this workflow after a matching Hardware Template exists. The included
+templates currently support the classic UNO D13 LED and R4 RF Jamming Detector;
+a temperature sensor needs the developer workflow above before it can offer a
+matching generated firmware package.
+
+1. Open **Add Project**, name the project and keep **Supported hardware** selected.
+   Choose its **Hardware Template**; this dropdown lists supported hardware only.
+2. Configure the device identity and USB COM port where applicable. The template
+   supplies transport, fields, units, pins, timing defaults and board artwork.
+3. Review the configuration and create the project. **Device setup** opens.
+4. Download the compatible firmware package. Its project/device IDs are already
+   generated for this project.
+5. Build and upload locally. Fill local Wi-Fi/broker credentials when needed,
+   then select **I uploaded this package** to record your upload confirmation.
+6. Start the USB gateway or connect the MQTT device and check fresh **Live**
+   telemetry in the workspace.
+
+Device setup displays **Configured → Firmware downloaded → Upload confirmed →
+Reporting → Telemetry verified**. Download and upload records stay in this
+browser; **Upload confirmed** is operator-confirmed. **Reporting** requires fresh
+Live telemetry. **Telemetry verified**
+checks the compatible telemetry contract using two fresh, complete samples with
+advancing sequence and receipt time in the same boot. Simulation/Replay never
+verify setup, and telemetry verification does not establish physical wiring,
+calibration or output. Reporting/verification expire when evidence becomes stale.
+
+The full stepper remains visible until all five stages have evidence, then
+collapses into a compact **Telemetry verified** badge. **View setup progress**
+expands it. Stale telemetry, a backend disconnect or a non-Live session
+automatically restores the full stepper. Telemetry never implies that firmware
+was downloaded or an upload was confirmed in this browser.
+
+Reuse the same Hardware Template for another project using the supported
+hardware. Download a package for each new project/device; you do not need to
+rewrite the driver or sketch.
+
+### Custom configuration and the MVP boundary
+
+Hardware Templates currently create **one device per project**. **Custom
+configuration** supports unsupported hardware and multiple-device assemblies,
+but the operator must supply matching firmware. Select **Custom configuration**
+as the setup method, then configure devices, components and fields. For example,
+adding a temperature component registers its fields; it does not generate a
+sensor driver or matching temperature firmware package. Legacy custom presets
+are no longer choices in the **Hardware Template** dropdown.
+
 ## Run both projects (Windows PowerShell)
 
 Run commands from the repository root. On a fresh checkout, install and build once:
@@ -101,8 +206,9 @@ Stop-Process -Id <PID>
 
 ## What works
 
+- Hardware Templates for the classic UNO D13 LED and R4 RF detector, generated per-device firmware packages, Device setup progress and configured Digital Twin artwork. See [Hardware Template setup](docs/hardware-templates.md).
 - Overview, project workspace, add-project flow, events and useful setup settings.
-- Editable starting templates with multiple devices, supported components, typed fields, scoped capabilities, and project-scoped agent configuration.
+- Editable custom configurations with multiple devices, supported components, typed fields, scoped capabilities, and project-scoped agent configuration.
 - Deterministic normal/level-change/pause/recovery simulations through the **same Store.ingest validation and storage boundary** as MQTT. UI components never generate readings. The simulator calls ingestion directly so a broker is not required for a laptop demo.
 - SQLite project definitions, source sessions, readings, events, actions, and successful agent conversations survive restart. A fresh database contains no hardcoded projects. Simulation producers are intentionally not resumed automatically after restart.
 - Live, simulated and replay histories and latest-state calculations are session-isolated. Replay explicitly selects the currently viewed original recording, keeps original provenance/timestamps and replays at most its latest 180 samples. Replay does not trigger fresh operational events.

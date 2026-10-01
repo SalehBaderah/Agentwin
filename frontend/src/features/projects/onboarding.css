@@ -1,0 +1,107 @@
+.onboarding-progress {
+  container-type: inline-size;
+}
+.onboarding-steps {
+  display: grid;
+  gap: 6px;
+}
+.onboarding-step {
+  position: relative;
+  min-width: 0;
+}
+.onboarding-step:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  left: 15px;
+  top: 32px;
+  bottom: -7px;
+  width: 1px;
+  background: var(--border-strong);
+  opacity: 0.55;
+  pointer-events: none;
+}
+.onboarding-stage {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 36px;
+  padding: 4px;
+  border-radius: 7px;
+  text-align: left;
+  cursor: help;
+  transition: background 150ms, color 150ms;
+}
+.onboarding-stage:hover {
+  background: var(--surface-hover);
+}
+.onboarding-stage:focus-visible {
+  outline: 2px solid var(--accent-text);
+  outline-offset: 2px;
+}
+.onboarding-marker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 10px;
+}
+.onboarding-label {
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.4;
+}
+.onboarding-step[data-complete="true"] .onboarding-marker {
+  border-color: var(--accent-border);
+  background: var(--accent-subtle);
+  color: var(--accent-text);
+}
+.onboarding-step[data-complete="true"] .onboarding-label {
+  color: var(--text-primary);
+}
+.onboarding-step[aria-current="step"] .onboarding-marker {
+  border-color: var(--accent-text);
+  box-shadow: 0 0 0 3px var(--accent-subtle);
+  color: var(--accent-text);
+}
+.onboarding-step[aria-current="step"] .onboarding-label {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+@container (min-width: 520px) {
+  .onboarding-steps {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .onboarding-stage {
+    flex-direction: column;
+    gap: 8px;
+    padding: 6px 2px;
+    text-align: center;
+  }
+  .onboarding-step:not(:last-child)::after {
+    left: calc(50% + 18px);
+    right: calc(-50% + 10px);
+    top: 18px;
+    bottom: auto;
+    width: auto;
+    height: 1px;
+  }
+  .onboarding-label {
+    width: 100%;
+    max-width: 120px;
+    font-size: 11px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .onboarding-stage {
+    transition: none;
+  }
+}

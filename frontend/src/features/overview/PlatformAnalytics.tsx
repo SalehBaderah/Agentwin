@@ -9,6 +9,7 @@ import { isVisibleMetric } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { State } from "@/types";
 import { ReadingCard } from "@/features/workspace/Readings";
+import { isCommandAcknowledgement } from "@/features/workspace/CommandAcknowledgement";
 
 export function PlatformAnalytics({ states }: { states: State[] }) {
   const [projectId, setProjectId] = useState(states[0]?.project.id || "");
@@ -16,8 +17,8 @@ export function PlatformAnalytics({ states }: { states: State[] }) {
   const [windowSize, setWindowSize] = useState("30");
   const selected = states.find((state) => state.project.id === projectId) || states[0];
   if (!selected) return null;
-  const visibleFields = Object.entries(selected.project.graph.fields).filter(([key]) => isVisibleMetric(key));
-  const field = selected.project.graph.fields[metricKey] && isVisibleMetric(metricKey) ? metricKey : visibleFields[0]?.[0] || selected.project.graph.primary_field;
+  const visibleFields = Object.entries(selected.project.graph.fields).filter(([key]) => isVisibleMetric(key) && !isCommandAcknowledgement(selected, key));
+  const field = visibleFields.some(([key]) => key === metricKey) ? metricKey : visibleFields[0]?.[0] || selected.project.graph.primary_field;
   const limit = windowSize === "all" ? selected.readings.length : Number(windowSize);
   const historyState = { ...selected, readings: selected.readings.slice(-limit) };
   const allDevices = states.flatMap((state) => state.devices);

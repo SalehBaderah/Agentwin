@@ -12,8 +12,16 @@ import type { State } from "@/types";
 import { time } from "@/types";
 import { readingModel } from "./readingModel";
 import { StateTimeline } from "./StateTimeline";
+import { CategoricalSummary } from "./CategoricalSummary";
+import { CommandAcknowledgementCard, isCommandAcknowledgement } from "./CommandAcknowledgement";
 
 export function ReadingCard({ state, field, embedded = false, categoricalView = "distribution" }: { state: State; field: string; embedded?: boolean; categoricalView?: "distribution" | "timeline" }) {
+  return isCommandAcknowledgement(state, field)
+    ? <CommandAcknowledgementCard state={state} field={field} embedded={embedded} />
+    : <MetricReadingCard state={state} field={field} embedded={embedded} categoricalView={categoricalView} />;
+}
+
+function MetricReadingCard({ state, field, embedded, categoricalView }: { state: State; field: string; embedded: boolean; categoricalView: "distribution" | "timeline" }) {
   const [limit, setLimit] = useState(5);
   const metric = state.project.graph.fields[field];
   const model = readingModel(state, field);
@@ -32,17 +40,7 @@ export function ReadingCard({ state, field, embedded = false, categoricalView = 
       <div className="min-w-0"><strong className="font-heading text-3xl font-semibold tracking-tight break-words tabular-nums">{format(latest?.readings[field])}</strong>{latest && metric.unit && <span className="ml-2 text-sm text-muted-foreground">{metric.unit}</span>}</div>
       <span className="text-xs text-muted-foreground" title={latest ? new Date(latest.received * 1000).toLocaleString() : undefined}>{latest ? `${fresh ? "Received" : "Last known"} ${time(latest.received)}` : "Awaiting telemetry"}</span>
     </div>
-    {latest ? (kind === "state" || kind === "category" && categoricalView === "timeline") ? <StateTimeline state={state} field={field} /> : kind === "category" ? <section className="border-t pt-5" aria-label={`${metric.label} distribution`}>
-      <div className="mb-5 flex flex-wrap items-baseline justify-between gap-2"><h5 className="text-xs font-medium">State distribution</h5><span className="text-[11px] text-muted-foreground">Share of {model.count} reported samples</span></div>
-      <div className="max-h-64 space-y-5 overflow-y-auto pr-1">
-        {model.categories.map((category, index) => <div key={category.label}>
-          <div className="mb-2 flex items-baseline justify-between gap-4 text-xs"><span className="min-w-0 break-all font-medium">{category.label}</span><span className="shrink-0 text-muted-foreground tabular-nums">{category.count} <span className="ml-2 font-semibold text-foreground">{category.percent.toLocaleString("en-US", { maximumFractionDigits: 1 })}%</span></span></div>
-          <div role="meter" aria-label={`${category.label}: ${category.count} samples`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={category.percent} className="h-3 overflow-hidden rounded-sm bg-muted/50" title={`${category.label}: ${category.count} of ${model.count} samples`}><div className="h-full rounded-sm motion-safe:transition-[width] motion-safe:duration-300" style={{ width: `${category.percent}%`, background: index % 2 === 0 ? "var(--chart-2)" : "var(--chart-1)" }} /></div>
-        </div>)}
-      </div>
-      <div className="mt-3 flex justify-between text-[10px] text-muted-foreground" aria-hidden="true"><span>0%</span><span>50%</span><span>100%</span></div>
-      <p className="mt-3 text-[11px] text-muted-foreground">Sample frequency, not duration in each state.</p>
-    </section> : <ChartContainer config={{ value: { label: metric.label, color } }} className="aspect-auto h-56 w-full border-t pt-5">
+    {latest ? (kind === "state" || kind === "category" && categoricalView === "timeline") ? <StateTimeline state={state} field={field} /> : kind === "category" ? <CategoricalSummary state={state} field={field} /> : <ChartContainer config={{ value: { label: metric.label, color } }} className="aspect-auto h-56 w-full border-t pt-5">
       <ComposedChart accessibilityLayer data={rows} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
         <CartesianGrid vertical={false} strokeDasharray="3 5" />
         <XAxis dataKey="received" type="number" domain={["dataMin", "dataMax"]} tickFormatter={value => time(Number(value))} tickLine={false} axisLine={false} minTickGap={65} />
@@ -63,6 +61,6 @@ export function Readings({ state }: { state: State }) {
   const fields = Object.entries(state.project.graph.fields);
   return <div className="grid gap-5">
     <div className="flex flex-wrap items-end justify-between gap-4"><div><h3 className="text-base font-semibold">Live readings</h3><p className="mt-1 text-[13px] text-muted-foreground">Stored observations from the selected session. Missing samples remain gaps.</p></div><FormField id="readings-metric" label="Metric"><OptionSelect id="readings-metric" value={field} onValueChange={setField} className="sm:w-56" options={[{ value: "all", label: "All metrics" }, ...fields.map(([key, item]) => ({ value: key, label: `${item.label} ${item.unit}` }))]} /></FormField></div>
-    <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,340px),1fr))] gap-4">{fields.filter(([key]) => field === "all" || field === key).map(([key]) => <ReadingCard key={`${state.session.id}:${key}`} state={state} field={key} />)}</div>
+    <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,340px),1fr))] items-start gap-4">{fields.filter(([key]) => field === "all" || field === key).map(([key]) => <ReadingCard key={`${state.session.id}:${key}`} state={state} field={key} />)}</div>
   </div>;
 }

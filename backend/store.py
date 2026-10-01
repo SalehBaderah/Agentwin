@@ -80,11 +80,17 @@ class Store:
 
     def create_project(self, request: ProjectCreate, pid=None):
         pid = pid or f'project-{uid()[:10]}'
-        configured_devices = [{'id': request.device_id, 'connector': request.connector, 'serial_port': request.serial_port, 'baud_rate': 115200}, *[{'id': item.device_id, 'connector': item.connector, 'serial_port': item.serial_port, 'baud_rate': item.baud_rate} for item in request.devices]]
+        configured_devices = [{'id': request.device_id, 'connector': request.connector, 'serial_port': request.serial_port, 'baud_rate': request.baud_rate}, *[{'id': item.device_id, 'connector': item.connector, 'serial_port': item.serial_port, 'baud_rate': item.baud_rate} for item in request.devices]]
         configured_components = [item.model_dump() for item in request.components]
         project = {'id': pid, **request.model_dump(exclude={'devices', 'components'}), 'description': f'{request.template.replace("_", " ").title()} project with independent telemetry, events, controls, and agent context.', 'arabic_title': None, 'created': time.time(), 'agent': {'version': 1, 'mode': 'observe', 'allowed_actions': ['acknowledge_event']}, 'devices': configured_devices, 'components': configured_components}
         project['monitoring']['silence_seconds'] = max(project['monitoring']['silence_seconds'], request.freshness_seconds)
         project['graph'] = definition(request.template, request.mapping.model_dump(), cable=request.cable_description, device_id=request.device_id, connector=request.connector, devices=configured_devices, components=configured_components or None, freshness_seconds=request.freshness_seconds)
+        from .hardware_templates import LEGACY, firmware_check
+        if request.template not in LEGACY:
+            if request.devices: raise ValueError('Hardware templates currently describe one device per project. Use a manual preset for a custom assembly.')
+            check = firmware_check(project, request.device_id, request.template)
+            if not check['compatible']: raise ValueError(' '.join(check['errors']))
+            project['firmware_template_version'] = check['version']
         self.validate_monitoring(project, project['monitoring'])
         self.execute('INSERT INTO projects VALUES (?,?)', (pid, json.dumps(project)))
         self.create_session(pid, 'live'); self.create_session(pid, 'simulated')

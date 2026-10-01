@@ -494,6 +494,11 @@ function DeviceWorkspace({
           Unknown profile—generic artwork ({resolved.requested}).
         </p>
       )}
+      {!local && controller?.source.configuration.artwork_source === "hardware-template" && (
+        <p className="px-4 pb-3 text-xs text-muted-foreground">
+          Artwork from Hardware Template configuration · not hardware detection.
+        </p>
+      )}
       {preferenceError && (
         <p className="px-4 text-xs text-warning" role="status">
           {preferenceError}
