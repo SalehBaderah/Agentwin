@@ -66,7 +66,9 @@ def test_commands_and_telemetry_are_scoped(store):
     scoped = {**command, 'project_id': project['id'], 'device_id': project['device_id']}
     assert json.loads(validate_command(json.dumps(scoped), project['id'], project['device_id']))['command_id'] == 'action-1'
     with pytest.raises(ValueError): validate_command(json.dumps(scoped), 'another-project', project['device_id'])
-    with pytest.raises(ValueError): validate_command(json.dumps({**command, 'value': 1}))
+    # The gateway forwards scalar envelopes; action-specific value validation
+    # belongs to the backend capability and the receiving firmware driver.
+    assert json.loads(validate_command(json.dumps({**command, 'value': 1})))['value'] == 1
 
 def test_corrupted_serial_telemetry_is_rejected_without_guessing_fields(store):
     project = store.project('smart-connectivity')

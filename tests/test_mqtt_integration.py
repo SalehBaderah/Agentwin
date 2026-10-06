@@ -60,8 +60,39 @@ def test_serial_to_mqtt_to_websocket(tmp_path, monkeypatch):
                 with client.websocket_connect(f'/api/ws?project=smart-connectivity&session={sid}') as ws:
                     snapshot=ws.receive_json()
                     assert snapshot['state']['latest']['readings']['led_on'] is False
+                # An arbitrary future numeric capability travels through the
+                # actual gateway, with no LED-specific transport allowlist.
+                project = app.state.store.project('smart-connectivity')
+                control = project['graph']['components'][-1]['controls'][0]
+                control.update(action='set_level', parameters={'value': {'type': 'number', 'minimum': 0, 'maximum': 1}})
+                project['graph']['components'][-1]['capabilities'] = ['action:set_level']
+                project['graph']['capabilities'][0].update(command='set_level', parameters=control['parameters'])
+                project['graph']['fields']['led_on']['data_type'] = 'number'
+                app.state.store.execute('UPDATE projects SET config=? WHERE id=?', (json.dumps(project), project['id']))
+                base = f'/api/projects/{project["id"]}/sessions/{sid}'
+                prepared = client.post(base+'/agent', json={'question': 'Prepare level', 'control_request': {'component_id': 'led', 'action': 'set_level', 'value': 0.5}})
+                proposal_id = prepared.json()['control_proposal']['id']
+                assert client.post(base+f'/actions/{proposal_id}/confirm').status_code == 202
+                connection.settimeout(10)
+                wire = b''
+                while not wire.endswith(b'\n'):
+                    chunk = connection.recv(1024)
+                    assert chunk
+                    wire += chunk
+                assert wire.startswith(b'CMD ')
+                command = json.loads(wire[4:])
+                assert command['command_id'] == proposal_id and command['action'] == 'set_level' and command['value'] == 0.5
+                assert app.state.store.actions(project['id'], sid)[0]['status'] == 'requested'
+                payload.update(sequence=4, uptime_ms=4000, readings={'led_on': 0.5, 'last_command_id': proposal_id})
+                connection.sendall(json.dumps(payload).encode()+b'\n')
+                deadline = time.monotonic()+5
+                while app.state.store.actions(project['id'], sid)[0]['status'] == 'requested' and time.monotonic() < deadline:
+                    time.sleep(.1)
+                assert app.state.store.actions(project['id'], sid)[0]['status'] == 'completed'
                 # The fixture only populates the live connector's isolated test DB.
-                assert app.state.store.state('smart-connectivity')['latest'] is None
+                simulated = app.state.store.create_session(project['id'], 'simulated')['id']
+                assert app.state.store.state(project['id'], simulated)['latest'] is None
+                assert app.state.store.actions(project['id'], simulated) == []
     finally:
         if gateway:
             gateway.terminate()

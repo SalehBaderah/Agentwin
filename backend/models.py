@@ -114,6 +114,7 @@ class Scenario(Strict):
 class Question(Strict):
     question: str = Field(min_length=1, max_length=2000)
     component_id: str | None = Field(default=None, pattern=r'^[a-z0-9-]{1,64}$')
+    control_request: ComponentAction | None = None
 
 class Settings(Strict):
     freshness_seconds: int = Field(ge=3, le=3600)

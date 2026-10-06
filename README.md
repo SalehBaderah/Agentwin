@@ -219,6 +219,7 @@ Stop-Process -Id <PID>
 - Physical 2D, data-flow, and topology Twin views generated from project components, with generic visuals for future project types. This branch does not provide a 3D/WebGL Twin.
 - Local Qwen synthesis through LM Studio with deterministic server-side observation routing, free-text redaction, JSON-schema output and server-attached evidence. The existing OpenAI Responses tool loop remains an optional provider. Provider failures explicitly display **AI agent unavailable** while deterministic monitoring continues.
 - Arduino USB telemetry plus a reconnecting pySerial/Paho gateway with availability reporting and live-only LED command forwarding. Requested actions remain separate from telemetry-confirmed completion.
+- Win sends explicit operator commands through project capabilities. Matching device telemetry is required before completion; optional drafts send nothing until confirmed.
 
 ## Architecture and contracts
 
@@ -241,7 +242,68 @@ flowchart LR
 
 `backend/models.py` owns request/message validation; generated telemetry schema is in `schemas/telemetry-v1.json`. `backend/templates.py` owns reusable fields/components/relationships. `backend/store.py` owns persistence and deterministic event rules. `backend/runtime.py` handles MQTT, simulation and replay. `backend/agent.py` owns tools and provider integration. `gateway/`, `firmware/`, `simulator/`, `frontend/`, `tests/`, and `docs/` contain their corresponding layers.
 
-API explorer: http://127.0.0.1:8000/docs. Project/session IDs in routes select the local operator's context; agent tool arguments cannot change it. This is a **single local operator MVP, not a multi-tenant authorization system**. The LED action API accepts only the declared `set_led` capability in a live session with an online gateway and broker. Agent proposals never execute physical actions.
+API explorer: http://127.0.0.1:8000/docs. Project/session IDs in routes select the local operator's context; agent tool arguments cannot change it. This is a **single local operator MVP, not a multi-tenant authorization system**. Physical actions require a declared, implemented capability, the Live session, and a connected broker; USB devices also require an online gateway. Preparing an agent proposal never dispatches a command.
+
+### Win physical controls
+
+In a project's **Live** session, give Win an immediate, unambiguous request in
+chat such as `Turn on the LED` or
+`Set <component ID> to <value>`. With the language model available, Win also
+understands equivalent wording such as `Light up the indicator` or
+`Make the indicator dark`, using the current project's component types and
+declared control metadata. If no matching actuator exists, Win says so and sends
+nothing. Unclear targets or values require clarification. The model cannot invent
+controls or select another project; the backend revalidates every interpreted
+request against the current configuration before dispatch.
+
+Conditional and scheduled requests send nothing. Win uses the project's configured
+controls to resolve pronouns and shorthand such as `turn it off`; model-selected
+commands must include target and operation evidence from the current message.
+Bare IDs, hashes and numbers never authorize hardware commands. Boolean shorthand
+such as `LED off` (including the unambiguous `led of` typo) works when exactly one
+configured control matches the target. Flexible language interpretation requires
+the configured model server. Use the **Controls** tab for manual device
+control when LM Studio is unavailable; basic unambiguous chat commands also work
+without the model. Win's panel contains chat and command feedback, without a
+duplicate manual control form.
+
+Use **Clear chat** in Win's header or type `/clear` to clear the visible conversation
+and command cards for this project/session in this browser. This does not cancel
+sent commands or delete backend records. New commands still appear. Command
+feedback shows a compact status row; expand its details or **Earlier commands**
+when you need the device, acknowledgement ID, or previous requests.
+
+An explicit operator request sends immediately; there is no second confirmation
+click. The controller checks the hardware contract, session, connection, values,
+and pending commands before dispatch. Conditional, scheduled, or unclear requests
+send nothing. Simulation and Replay cannot send physical controls.
+
+To review without sending, explicitly ask for a draft, for example
+`Draft turn the LED on`. A draft remains **Not sent** until you choose
+**Confirm & send** within two minutes. **Cancel proposal** sends nothing.
+Configuration changes invalidate a saved draft. All commands and drafts are
+persisted and scoped to their project/session.
+
+The command status advances from **Sent · awaiting device → Completed**.
+Completion requires subsequent telemetry from the same device and Live session
+with both the expected value and this command's acknowledgement ID. Publishing
+does not change reported state optimistically. Missing acknowledgement leads to
+a timeout; telemetry confirmation is not independent proof of physical output.
+
+The flow is generic: new systems automatically expose their supported controls
+through `graph.components[].controls` and capability metadata, without adding
+project names or command names to Win's UI. A developer must register the
+implemented capability, its `value` parameter schema, expected telemetry field,
+same-device command acknowledgement field, and matching firmware handler.
+Boolean, integer, finite numeric, and text values are supported, including
+declared ranges and enums. The USB gateway forwards valid scalar command
+envelopes; firmware accepts only actions registered by its hardware drivers.
+Declaring metadata alone does not implement an actuator. Multi-parameter or
+no-value commands need an explicit protocol extension before being exposed.
+
+Today the UNO D13 LED has a physical control; the R4 RF Jamming Detector remains
+read-only because its firmware declares no actuator. Existing manual Controls
+and Twin controls continue to use the same command/telemetry contract.
 
 ### AI security and evidence
 

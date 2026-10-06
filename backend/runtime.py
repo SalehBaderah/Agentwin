@@ -3,6 +3,7 @@ from paho.mqtt import client as mqtt
 from .agent import scheduled_summary
 from .notifications import send_email, smtp_configured
 from .store import uid
+from .control_proposals import control_contract, pending_proposal
 
 log = logging.getLogger(__name__)
 
@@ -42,27 +43,50 @@ class Runtime:
         self.client.on_connect, self.client.on_disconnect, self.client.on_message = connected, disconnected, message
         self.client.connect_async(os.getenv('MQTT_HOST', '127.0.0.1'), int(os.getenv('MQTT_PORT', '1883')), 15); self.client.loop_start()
 
-    def component_action(self, pid, sid, component_id, action, value):
-        session, project = self.store.session(pid, sid), self.store.project(pid)
-        if session['mode'] != 'live': raise ValueError('Physical actions require the live session')
-        component = next((item for item in project['graph']['components'] if item['id'] == component_id), None)
-        control = next((item for item in (component or {}).get('controls', []) if item['action'] == action), None)
-        if not control or f'action:{action}' not in component['capabilities']: raise ValueError('Action is not implemented for this component')
-        allowed = control.get('parameters', {}).get('value', {}).get('allowed_values')
-        if allowed is not None and value not in allowed: raise ValueError('Value is not allowed for this capability')
-        device = project['graph']['fields'].get(control['expected']['field'], {}).get('device_id') or project['device_id']
-        device_config = next((item for item in project['devices'] if item['id'] == device), None)
-        if not device_config: raise ValueError('Control device is not registered to this project')
-        gateway = self.store.rows('SELECT * FROM gateways WHERE project=? AND device=?', (pid, device))
-        if device_config['connector'] == 'usb' and (not gateway or not gateway[0]['online'] or time.time()-gateway[0]['received'] > 10): raise ValueError('USB gateway is not connected for this device')
-        if not self.client or not self.mqtt_connected: raise ValueError('MQTT broker is not connected')
-        action_id, timeout = uid(), control.get('timeout_seconds', 15)
-        self.store.execute('INSERT INTO actions VALUES (?,?,?,?,?,?,?)', (action_id, pid, sid, time.time(), f'{action}:{json.dumps(value)}', component_id, 'requested'))
-        command_field = control['expected'].get('command_field', 'last_command_id')
-        self.store.execute('INSERT INTO action_expectations(action_id,device,field,expected,deadline,command_field) VALUES (?,?,?,?,?,?)', (action_id, device, control['expected']['field'], json.dumps(value), time.time()+timeout, command_field))
-        info = self.client.publish(f'agentwin/{pid}/{device}/command', json.dumps({'schema_version': 1, 'project_id': pid, 'device_id': device, 'command_id': action_id, 'action': action, 'component_id': component_id, 'value': value}), qos=1, retain=False)
-        if info.rc != mqtt.MQTT_ERR_SUCCESS: self.store.execute("UPDATE actions SET status='failed' WHERE id=?", (action_id,)); raise ValueError('Command could not be published')
-        return {'id': action_id, 'status': 'requested', 'timeout_seconds': timeout}
+    def component_action(self, pid, sid, component_id, action, value, *, proposal_id=None):
+        with self.store.lock:
+            _, control, device_config, _ = control_contract(self.store, pid, sid, component_id, action, value)
+            device = device_config['id']
+            gateway = self.store.rows('SELECT * FROM gateways WHERE project=? AND device=?', (pid, device))
+            if device_config['connector'] == 'usb' and (not gateway or not gateway[0]['online'] or time.time()-gateway[0]['received'] > 10): raise ValueError('USB gateway is not connected for this device')
+            if not self.client or not self.mqtt_connected: raise ValueError('MQTT broker is not connected')
+            if proposal_id and self.store.rows("SELECT id FROM actions WHERE project=? AND session=? AND target=? AND status='requested'", (pid, sid, component_id)):
+                raise ValueError('A command is already pending for this component; wait for its result')
+            action_id, timeout = proposal_id or uid(), control.get('timeout_seconds', 15)
+            if proposal_id:
+                changed = self.store.db.execute("UPDATE actions SET status='requested' WHERE id=? AND project=? AND session=? AND status='awaiting_confirmation'", (action_id, pid, sid)).rowcount
+                if changed != 1: raise ValueError('This proposal has already been handled')
+            else:
+                self.store.db.execute('INSERT INTO actions VALUES (?,?,?,?,?,?,?)', (action_id, pid, sid, time.time(), f'{action}:{json.dumps(value)}', component_id, 'requested'))
+            command_field = control['expected'].get('command_field', 'last_command_id')
+            self.store.db.execute('INSERT INTO action_expectations(action_id,device,field,expected,deadline,command_field) VALUES (?,?,?,?,?,?)', (action_id, device, control['expected']['field'], json.dumps(value), time.time()+timeout, command_field))
+            self.store.db.commit()
+            try:
+                info = self.client.publish(f'agentwin/{pid}/{device}/command', json.dumps({'schema_version': 1, 'project_id': pid, 'device_id': device, 'command_id': action_id, 'action': action, 'component_id': component_id, 'value': value}), qos=1, retain=False)
+                if info.rc != mqtt.MQTT_ERR_SUCCESS: raise ValueError('Command could not be published')
+            except Exception as error:
+                self.store.execute("UPDATE actions SET status='failed' WHERE id=?", (action_id,))
+                raise ValueError('Command could not be published') from error
+            return {'id': action_id, 'status': 'requested', 'timeout_seconds': timeout}
+
+    def confirm_control_proposal(self, pid, sid, action_id):
+        with self.store.lock:
+            _, details = pending_proposal(self.store, pid, sid, action_id)
+            try:
+                _, _, _, contract = control_contract(self.store, pid, sid, details['component_id'], details['action'], details['value'])
+            except ValueError:
+                self.store.execute("UPDATE actions SET status='invalidated' WHERE id=?", (action_id,))
+                raise ValueError('Hardware configuration changed; ask Win for a new proposal') from None
+            if contract != details['contract']:
+                self.store.execute("UPDATE actions SET status='invalidated' WHERE id=?", (action_id,))
+                raise ValueError('Hardware configuration changed; ask Win for a new proposal')
+            return self.component_action(pid, sid, details['component_id'], details['action'], details['value'], proposal_id=action_id)
+
+    def cancel_control_proposal(self, pid, sid, action_id):
+        with self.store.lock:
+            pending_proposal(self.store, pid, sid, action_id)
+            self.store.execute("UPDATE actions SET status='cancelled' WHERE id=? AND status='awaiting_confirmation'", (action_id,))
+        return {'id': action_id, 'status': 'cancelled'}
 
     async def scenario(self, pid, sid, scenario):
         if self.store.session(pid, sid)['mode'] != 'simulated': raise ValueError('Simulation controls require a simulated session')
