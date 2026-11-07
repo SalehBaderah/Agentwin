@@ -1,4 +1,5 @@
-import { chromium, expect } from "@playwright/test";
+import { launchBrowser } from "./browser.mjs";
+import { expect } from "@playwright/test";
 import { spawn } from "node:child_process";
 import fs from "node:fs";
 import { chooseValue } from "./helpers.mjs";
@@ -6,7 +7,7 @@ import { chooseValue } from "./helpers.mjs";
 const base = process.env.AGENTWIN_TEST_URL || "http://127.0.0.1:5173";
 if (new URL(base).port === "8000")
   throw Error("Use an isolated database and MQTT test broker.");
-const browser = await chromium.launch({ channel: "msedge", headless: true });
+const browser = await launchBrowser();
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 const checks = [],
   errors = [];

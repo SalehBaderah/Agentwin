@@ -1,6 +1,7 @@
-import { chromium, expect } from '@playwright/test';
+import { launchBrowser } from "./browser.mjs";
+import { expect } from "@playwright/test";
 import fs from 'node:fs';
-const browser=await chromium.launch({channel:'msedge',headless:true});
+const browser=await launchBrowser();
 const page=await browser.newPage({viewport:{width:1900,height:1100}});
 const errors=[];page.on('pageerror',e=>errors.push(e.message));
 const writes=[];page.on('request',r=>{if(r.url().includes('/api/')&&r.method()!=='GET')writes.push(r.method()+' '+r.url());});

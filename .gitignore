@@ -6,6 +6,9 @@ __pycache__/
 data/
 dist/
 .env
+.env.*
+!.env.example
+!.env.*.example
 artifacts/
 firmware/projects/*/secrets.h
 broker/passwords
@@ -15,3 +18,25 @@ broker/private-network.conf
 .pytest-tmp
 *-live.log
 *-live.err.log
+
+# Credentials and local database copies, including files outside data/.
+*.pem
+*.key
+*.p12
+*.pfx
+*.sqlite
+*.sqlite3
+*.db
+*.db-shm
+*.db-wal
+
+# Generated verification reports and local editor/OS files.
+playwright-report/
+test-results/
+coverage/
+.coverage
+htmlcov/
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

@@ -1,4 +1,5 @@
-import { chromium, expect } from '@playwright/test';
+import { launchBrowser } from "./browser.mjs";
+import { expect } from "@playwright/test";
 
 const base = process.env.AGENTWIN_TEST_URL || 'http://127.0.0.1:5176';
 const backend = process.env.AGENTWIN_BACKEND_URL || 'http://127.0.0.1:8000';
@@ -38,7 +39,7 @@ const holds = new Map();
 const requests = [];
 let holdGet = false;
 let delayedSnapshot;
-const browser = await chromium.launch({ executablePath: 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', headless: true });
+const browser = await launchBrowser();
 const context = await browser.newContext({ viewport: { width: 1500, height: 1100 } });
 const errors = [];
 const page = await context.newPage();

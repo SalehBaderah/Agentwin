@@ -1,11 +1,12 @@
+import { launchBrowser } from "./browser.mjs";
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
-import { chromium } from '@playwright/test';
+
 import { chooseValue } from './helpers.mjs';
 
 // Point creation tests at the isolated, background-disabled backend on 8011.
 const base = process.env.AGENTWIN_TEMPLATE_TEST_URL || 'http://127.0.0.1:8011';
-const browser = await chromium.launch({ executablePath: 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', headless: true });
+const browser = await launchBrowser();
 const page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, acceptDownloads: true });
 const failures = [];
 const created = [];

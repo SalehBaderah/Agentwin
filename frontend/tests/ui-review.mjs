@@ -1,4 +1,5 @@
-import { chromium, expect } from "@playwright/test";
+import { launchBrowser } from "./browser.mjs";
+import { expect } from "@playwright/test";
 import fs from "node:fs";
 
 const base = process.env.AGENTWIN_TEST_URL || "http://127.0.0.1:5173";
@@ -6,7 +7,7 @@ if (new URL(base).port === "8000")
   throw Error("Use an isolated backend/database for this review.");
 const output = "../artifacts/ui-review";
 fs.mkdirSync(output, { recursive: true });
-const browser = await chromium.launch({ channel: "msedge", headless: true });
+const browser = await launchBrowser();
 const context = await browser.newContext({
   viewport: { width: 1440, height: 900 },
   permissions: ["clipboard-read", "clipboard-write"],

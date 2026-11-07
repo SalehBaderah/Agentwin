@@ -1,6 +1,7 @@
+import { launchBrowser } from "./browser.mjs";
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
-import { chromium, expect } from '@playwright/test';
+import { expect } from "@playwright/test";
 
 // All device evidence below is a synthetic browser fixture. It is never ingested.
 // Refuse production's port even when an environment override is supplied.
@@ -8,7 +9,7 @@ const base = new URL(process.env.AGENTWIN_TEMPLATE_TEST_URL || 'http://127.0.0.1
 assert.equal(base.port, '8011', 'Use the isolated, background-disabled test backend on port 8011.');
 assert.ok(['127.0.0.1', 'localhost'].includes(base.hostname), 'Test backend must be local.');
 assert.equal(base.protocol, 'http:');
-const browser = await chromium.launch({ executablePath: 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', headless: true });
+const browser = await launchBrowser();
 const page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, acceptDownloads: true });
 const failures = [];
 const sockets = new Set();

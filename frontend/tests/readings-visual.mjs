@@ -1,7 +1,8 @@
-import { chromium, expect } from '@playwright/test';
+import { launchBrowser } from "./browser.mjs";
+import { expect } from "@playwright/test";
 import fs from 'node:fs';
 const base = process.env.AGENTWIN_TEST_URL || 'http://127.0.0.1:8000';
-const browser = await chromium.launch({ executablePath: process.env.AGENTWIN_BROWSER_PATH || 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', headless: true });
+const browser = await launchBrowser();
 const page = await browser.newPage();
 const errors = [];
 page.on('pageerror', e => errors.push(e.message));

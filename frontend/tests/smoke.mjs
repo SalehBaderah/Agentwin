@@ -1,9 +1,9 @@
-import { chromium } from "@playwright/test";
+import { launchBrowser } from "./browser.mjs";
 import fs from "node:fs";
 import { chooseValue } from "./helpers.mjs";
 const output = "../artifacts";
 fs.mkdirSync(output, { recursive: true });
-const browser = await chromium.launch({ channel: "msedge", headless: true });
+const browser = await launchBrowser();
 const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
 const errors = [];
 let createdId = "";
@@ -19,7 +19,7 @@ try {
   await page.getByRole("heading", { name: "Add a project" }).waitFor();
   await page.screenshot({ path: output + "/platform-onboarding.png", fullPage: true });
   await page.getByLabel("Project name").fill("Browser temperature");
-  await chooseValue(page, page.getByLabel("Starting template"), "temperature");
+  await page.getByRole("radio", { name: "Custom configuration", exact: true }).check();
   await page.getByRole("button", { name: "Continue" }).click();
   await page.getByLabel("Device ID").fill("browser-temp-01");
   await chooseValue(page, page.getByLabel("Transport"), "mqtt");
@@ -46,6 +46,7 @@ try {
   await page.getByRole("tab", { name: "Digital twin" }).click();
   await page.locator(".physical-svg").first().waitFor();
   await page.screenshot({ path: output + "/platform-live-twin.png", fullPage: true });
+  await page.getByRole("tab", { name: "Data Flow", exact: true }).click();
   await page.getByRole("button", { name: "Inspect USB connector", exact: true }).focus();
   await page.keyboard.press("Enter");
   await page.getByRole("heading", { name: "USB connector", exact: true }).waitFor();
@@ -60,6 +61,7 @@ try {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(base + "/projects/" + createdId);
   await page.getByRole("tab", { name: "Digital twin" }).click();
+  await page.getByRole("tab", { name: "Physical 2D", exact: true }).click();
   await page.locator(".physical-svg").first().waitFor();
   await check(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "Horizontal overflow on mobile Twin");
   await page.screenshot({ path: output + "/platform-mobile.png", fullPage: true });

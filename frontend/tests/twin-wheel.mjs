@@ -1,5 +1,6 @@
-import { chromium, expect } from '@playwright/test';
-const browser = await chromium.launch({ channel: 'msedge', headless: true });
+import { launchBrowser } from "./browser.mjs";
+import { expect } from "@playwright/test";
+const browser = await launchBrowser();
 const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
 try {
   const states = await (await page.request.get('http://127.0.0.1:8000/api/projects')).json();

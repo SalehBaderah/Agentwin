@@ -1,5 +1,6 @@
-import { chromium,expect } from '@playwright/test';
-const browser=await chromium.launch({channel:'msedge',headless:true});
+import { launchBrowser } from "./browser.mjs";
+import { expect } from "@playwright/test";
+const browser=await launchBrowser();
 const page=await browser.newPage({viewport:{width:1300,height:1000}});
 page.on('pageerror',error=>console.error(error));
 try{

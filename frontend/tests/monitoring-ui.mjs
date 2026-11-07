@@ -1,4 +1,5 @@
-import { chromium, expect } from "@playwright/test";
+import { launchBrowser } from "./browser.mjs";
+import { expect } from "@playwright/test";
 import { mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { chooseValue } from "./helpers.mjs";
@@ -9,7 +10,7 @@ const otherProjectId = process.env.AGENTWIN_OTHER_PROJECT_ID;
 const artifacts = process.env.AGENTWIN_ARTIFACTS || "../artifacts";
 if (!projectId) throw new Error("Set AGENTWIN_PROJECT_ID to a disposable review project");
 await mkdir(artifacts, { recursive: true });
-const browser = await chromium.launch({ channel: "chrome", headless: true });
+const browser = await launchBrowser();
 try {
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
   const errors = [];

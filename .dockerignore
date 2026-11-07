@@ -1,6 +1,13 @@
 .git
 .venv
 .env
+.env.*
+**/secrets.h
+**/*.pem
+**/*.key
+**/*.db
+**/*.db-shm
+**/*.db-wal
 data
 **/node_modules
 **/dist
@@ -12,4 +19,7 @@ broker
 docs
 evals
 tests
+output
+.github
+IDRAK_*.md
 *.log
