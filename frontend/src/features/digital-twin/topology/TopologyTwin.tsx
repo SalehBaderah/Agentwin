@@ -1,5 +1,6 @@
-import { useEffect, useMemo } from "react";
-import { Background, Controls, MarkerType, MiniMap, Position, ReactFlow, useNodesState, type Edge, type Node } from "@xyflow/react";
+import { metricValue } from "@/lib/format";
+import { useEffect, useMemo, useState } from "react";
+import { Background, Controls, MarkerType, MiniMap, Position, ReactFlow, useNodesState, type ReactFlowInstance, type Edge, type Node } from "@xyflow/react";
 import type { TwinComponentState, TwinState } from "../model/twin.types";
 
 const relationshipColor: Record<string, string> = {
@@ -13,7 +14,7 @@ const relationshipColor: Record<string, string> = {
 function displayMetric(component: TwinComponentState) {
   const metric = component.observed.metrics[0];
   if (!metric || metric.value === null || metric.value === undefined) return "No live measurements";
-  const value = typeof metric.value === "number" ? metric.value.toLocaleString("en-US", { maximumFractionDigits: metric.precision }) : typeof metric.value === "boolean" ? (metric.value ? "On" : "Off") : String(metric.value);
+  const value = typeof metric.value === "number" ? metricValue(metric.value, metric.precision) : typeof metric.value === "boolean" ? (metric.value ? "On" : "Off") : String(metric.value);
   return `${metric.isLastKnown ? "Last known · " : ""}${value}${metric.unit ? ` ${metric.unit}` : ""}`;
 }
 
@@ -27,11 +28,16 @@ function TopologyNode({ component, selected }: { component: TwinComponentState; 
 }
 
 export function TopologyTwin({ twin, selectedId, onSelect }: { twin: TwinState; selectedId: string; onSelect: (id: string) => void }) {
+  const [instance, setInstance] = useState<ReactFlowInstance | null>(null);
+  const storageKey = "agentwin-topology:" + twin.project.id;
+  const savedViewport = useMemo(() => { try { const v = JSON.parse(localStorage.getItem(storageKey + ":viewport") || "null"); return v && [v.x,v.y,v.zoom].every(Number.isFinite) && v.zoom > 0 ? v : undefined; } catch { return undefined; } }, [storageKey]);
+  const restorePosition = (id: string, fallback: {x:number;y:number}) => { try { const saved = JSON.parse(localStorage.getItem(storageKey) || "{}")[id]; return saved && Number.isFinite(saved.x) && Number.isFinite(saved.y) ? saved : fallback; } catch { return fallback; } };
+  useEffect(() => { const focus = (event: Event) => { void instance?.fitView({ nodes: [{ id: (event as CustomEvent<string>).detail }], padding: .6, duration: 0 }); }; window.addEventListener("agentwin-focus-component", focus); return () => window.removeEventListener("agentwin-focus-component", focus); }, [instance]);
   const initialNodes = useMemo<Node[]>(() => twin.layout.map((component) => ({
     id: component.id,
     sourcePosition: Position.Right,
     targetPosition: Position.Left,
-    position: { x: component.x, y: component.y },
+    position: restorePosition(component.id, { x: component.x, y: component.y }),
     data: { label: <TopologyNode component={component} selected={component.id === selectedId}/> },
     style: { padding: 0, border: 0, background: "transparent", width: 220 },
   })), [twin.source.project.id]);
@@ -39,7 +45,7 @@ export function TopologyTwin({ twin, selectedId, onSelect }: { twin: TwinState; 
   useEffect(() => {
     setNodes((current) => twin.layout.map((component) => {
       const node = current.find((item) => item.id === component.id);
-      return { ...node, id: component.id, sourcePosition: Position.Right, targetPosition: Position.Left, position: node?.position || { x: component.x, y: component.y }, style: { padding: 0, border: 0, background: "transparent", width: 220 }, data: { label: <TopologyNode component={component} selected={component.id === selectedId}/> } };
+      return { ...node, id: component.id, sourcePosition: Position.Right, targetPosition: Position.Left, position: node?.position || restorePosition(component.id, { x: component.x, y: component.y }), style: { padding: 0, border: 0, background: "transparent", width: 220 }, data: { label: <TopologyNode component={component} selected={component.id === selectedId}/> } };
     }));
   }, [selectedId, setNodes, twin.layout]);
   const edges = useMemo<Edge[]>(() => twin.edges.map((edge) => ({
@@ -57,7 +63,7 @@ export function TopologyTwin({ twin, selectedId, onSelect }: { twin: TwinState; 
   return <div className="topology-view">
     <div className="topology-note">Configured architecture · layout changes affect this view only.</div>
     <div className="twin twin-canvas" aria-label="Configured system topology">
-      <ReactFlow nodes={nodes} edges={edges} onNodesChange={onNodesChange} onNodeClick={(_, node) => onSelect(node.id)} nodesDraggable nodesConnectable={false} elementsSelectable fitView fitViewOptions={{ padding: .2 }} minZoom={.4} maxZoom={1.8} proOptions={{ hideAttribution: true }}>
+      <ReactFlow defaultViewport={savedViewport} onMoveEnd={(_, viewport) => localStorage.setItem(storageKey + ":viewport", JSON.stringify(viewport))} onInit={setInstance} onNodeDragStop={(_, node) => { let saved = {}; try { saved = JSON.parse(localStorage.getItem(storageKey) || "{}"); } catch { /* Reset invalid layout. */ } localStorage.setItem(storageKey, JSON.stringify({ ...saved, [node.id]: node.position })); }} nodes={nodes} edges={edges} onNodesChange={onNodesChange} onNodeClick={(_, node) => onSelect(node.id)} nodesDraggable nodesConnectable={false} elementsSelectable fitView={!savedViewport} fitViewOptions={{ padding: .2 }} minZoom={.4} maxZoom={1.8} proOptions={{ hideAttribution: true }}>
         <Background color="var(--border-strong)" gap={24} size={1}/><MiniMap pannable zoomable nodeColor="var(--operational-cyan)" maskColor="var(--minimap-mask)"/><Controls showInteractive={false}/>
       </ReactFlow>
     </div>

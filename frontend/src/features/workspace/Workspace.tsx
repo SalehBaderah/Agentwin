@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { Activity, ArrowLeft, Bell, Cable, Database, PanelRightOpen } from "lucide-react";
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
@@ -24,9 +24,10 @@ import { ControlsPanel } from "./ControlsPanel";
 import { Events } from "./Events";
 import { ProjectOverview } from "./ProjectOverview";
 import { Readings } from "./Readings";
+import { FirmwareSetup } from "@/features/projects/FirmwareSetup";
 
 const DigitalTwin = lazy(() => import("@/features/digital-twin/DigitalTwin").then((module) => ({ default: module.DigitalTwin })));
-const tabs: [string, string][] = [["overview", "Overview"], ["readings", "Live readings"], ["twin", "Digital twin"], ["events", "Events & history"], ["controls", "Controls"]];
+const tabs: [string, string][] = [["overview", "Overview"], ["readings", "Live readings"], ["twin", "Digital twin"], ["events", "Events & history"], ["controls", "Controls"], ["setup", "Device setup"]];
 const mobileQuery = "(max-width: 760px)";
 
 export function Workspace({ connected, onContextChange }: { connected: boolean; onContextChange: (context: ProjectContext) => void }) {
@@ -36,11 +37,24 @@ export function Workspace({ connected, onContextChange }: { connected: boolean; 
   const [agentCollapsed, setAgentCollapsed] = useState(() => window.matchMedia(mobileQuery).matches || localStorage.getItem("agentwin-collapsed") === "true");
   const { id } = useParams();
   const navigate = useNavigate();
-  const [state, setState] = useState<State | null>(null), [error, setError] = useState(""), [sid, setSid] = useState(""), [selectedComponentId, setSelectedComponentId] = useState<string | null>(null);
+  const [state, setState] = useState<State | null>(null), [error, setError] = useState(""), [selectedComponentId, setSelectedComponentId] = useState<string | null>(null);
+  const [sessionSelection, setSessionSelection] = useState({ projectId: id, sessionId: "" });
+  const sid = sessionSelection.projectId === id ? sessionSelection.sessionId : "";
+  const setSid = (sessionId: string) => setSessionSelection({ projectId: id, sessionId });
+  const context = useMemo(() => ({ id, sid }), [id, sid]);
+  const activeContext = useRef<typeof context | null>(null);
+  useLayoutEffect(() => {
+    activeContext.current = context;
+    return () => { activeContext.current = null; };
+  }, [context]);
   const [tab, setTab] = useState(new URLSearchParams(location.search).get("tab") || "twin");
   const refresh = useCallback(() => {
-    api<State>("/projects/" + id + (sid ? "?session=" + sid : "")).then((s) => { setState(s); setError(""); }).catch((e) => setError(e.message));
-  }, [id, sid]);
+    if (activeContext.current !== context) return;
+    api<State>("/projects/" + id + (sid ? "?session=" + sid : "")).then((s) => {
+      if (activeContext.current !== context || s.project.id !== id || (sid ? s.session.id !== sid : s.session.mode !== "live")) return;
+      setState(s); setError("");
+    }).catch((e) => { if (activeContext.current === context) setError(e.message); });
+  }, [id, sid, context]);
   useEffect(() => { setState(null); setSelectedComponentId(null); }, [id]);
   useEffect(() => {
     refresh();
@@ -49,14 +63,18 @@ export function Workspace({ connected, onContextChange }: { connected: boolean; 
     let stopped = false;
     const connect = () => {
       socket = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/api/ws?project=${id}${sid ? `&session=${sid}` : ""}`);
-      socket.onopen = refresh;
-      socket.onmessage = (e) => { const m = JSON.parse(e.data); if (m.type === "project_snapshot") { setState(m.state); setError(""); } };
+      socket.onopen = () => { if (!stopped) refresh(); };
+      socket.onmessage = (e) => {
+        if (stopped || activeContext.current !== context) return;
+        const m = JSON.parse(e.data);
+        if (m.type === "project_snapshot" && m.state.project.id === id && (sid ? m.state.session.id === sid : m.state.session.mode === "live")) { setState(m.state); setError(""); }
+      };
       socket.onclose = () => { if (!stopped) timer = setTimeout(connect, 2000); };
       socket.onerror = () => socket.close();
     };
     connect();
     return () => { stopped = true; clearTimeout(timer); socket?.close(); };
-  }, [refresh, id, sid]);
+  }, [refresh, id, sid, context]);
   useEffect(() => { if (state) onContextChange({ projectId: state.project.id, mode: state.session.mode }); }, [state?.project.id, state?.session.mode, onContextChange]);
   useEffect(() => {
     const mobile = window.matchMedia(mobileQuery);
@@ -70,7 +88,7 @@ export function Workspace({ connected, onContextChange }: { connected: boolean; 
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
   }, [agentCollapsed]);
-  if (!state) return <Page><EmptyState>{error || "Loading project…"}</EmptyState></Page>;
+  if (!state || state.project.id !== id || (sid ? state.session.id !== sid : state.session.mode !== "live")) return <Page><EmptyState>{error || "Loading project…"}</EmptyState></Page>;
   const p = state.project;
   const removeProject = async () => {
     setDeleting(true);
@@ -169,6 +187,7 @@ export function Workspace({ connected, onContextChange }: { connected: boolean; 
             </TabsContent>
             <TabsContent value="events" className={panelClass("events")}><Events state={state} refresh={refresh} /></TabsContent>
             <TabsContent value="controls" className={panelClass("controls")}><ControlsPanel state={state} refresh={refresh} /></TabsContent>
+            <TabsContent value="setup" className={panelClass("setup")}><FirmwareSetup project={p} state={state} connected={connected} /></TabsContent>
           </Tabs>
         </section>
         {!agentCollapsed && <button type="button" className="relative hidden cursor-col-resize after:absolute after:inset-y-0 after:left-1/2 after:w-px after:bg-border after:transition-colors hover:after:bg-brand focus-visible:outline-none focus-visible:after:w-0.5 focus-visible:after:bg-brand min-[1181px]:block" aria-label="Resize agent panel" title="Drag to resize; use arrow keys; double-click to reset" onPointerDown={startAgentResize} onKeyDown={nudgeAgentWidth} onDoubleClick={() => { setAgentWidth(380); localStorage.setItem("agentwin-agent-width", "380"); }} />}
@@ -187,7 +206,7 @@ export function Workspace({ connected, onContextChange }: { connected: boolean; 
             </Button>
           )}
           <div hidden={agentCollapsed} className="relative max-md:max-h-[88svh] max-md:w-full max-md:overflow-y-auto max-md:rounded-t-[18px] min-[1181px]:sticky min-[1181px]:top-20 min-[1181px]:h-full min-[1181px]:max-h-[calc(100svh-6rem)]">
-            <AgentPanel key={`${state.project.id}:${state.session.id}`} state={state} onCollapse={toggleAgent} />
+            <AgentPanel key={`${state.project.id}:${state.session.id}`} state={state} onCollapse={toggleAgent} refresh={refresh} />
           </div>
         </aside>
       </div>

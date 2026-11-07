@@ -59,10 +59,11 @@ class MonitoringSettings(Strict):
 
 class ProjectCreate(Strict):
     name: str = Field(min_length=1, max_length=100)
-    template: Literal['led', 'temperature', 'water', 'connectivity', 'generic'] = 'generic'
+    template: str = Field(default='generic', pattern=r'^[a-z][a-z0-9_-]{0,63}$')
     device_id: str = Field(default='device-01', pattern=r'^[a-z0-9-]{1,64}$')
     connector: Literal['usb', 'mqtt'] = 'usb'
     serial_port: str | None = Field(default=None, max_length=80)
+    baud_rate: int = Field(default=115200, ge=1200, le=2000000)
     mapping: Mapping = Field(default_factory=Mapping)
     freshness_seconds: int = Field(default=8, ge=3, le=3600)
     interval_seconds: int = Field(default=1, ge=1, le=600)
@@ -72,6 +73,21 @@ class ProjectCreate(Strict):
     components: list[ComponentCreate] = Field(default_factory=list, max_length=64)
     retention_days: int = Field(default=30, ge=1, le=3650)
     monitoring: MonitoringSettings = Field(default_factory=MonitoringSettings)
+    @model_validator(mode='before')
+    @classmethod
+    def hardware_defaults(cls, data):
+        if not isinstance(data, dict): return data
+        template = data.get('template', 'generic')
+        if not isinstance(template, str): return data
+        if template in ('led', 'temperature', 'water', 'connectivity', 'generic'): return data
+        from .hardware_templates import get_template
+        spec = get_template(template)
+        data = dict(data)
+        for key in ('device_id', 'connector', 'baud_rate', 'interval_seconds', 'freshness_seconds'):
+            data.setdefault(key, spec['defaults'][key])
+        data.setdefault('components', [{**item, 'device_id': data['device_id'], 'freshness_seconds': data['freshness_seconds']} for item in spec['components']])
+        data.setdefault('mapping', {'field': spec['components'][0]['field_key'], 'unit': spec['components'][0]['unit'] or 'state'})
+        return data
     @model_validator(mode='after')
     def intervals(self):
         if self.freshness_seconds < self.interval_seconds * 2: raise ValueError('Freshness must be at least twice the sampling interval')
@@ -98,6 +114,7 @@ class Scenario(Strict):
 class Question(Strict):
     question: str = Field(min_length=1, max_length=2000)
     component_id: str | None = Field(default=None, pattern=r'^[a-z0-9-]{1,64}$')
+    control_request: ComponentAction | None = None
 
 class Settings(Strict):
     freshness_seconds: int = Field(ge=3, le=3600)

@@ -1,0 +1,89 @@
+{
+  "id": "r4_rf_jamming_detector",
+  "version": 1,
+  "name": "R4 RF Jamming Detector",
+  "description": "UNO R4 WiFi with the existing A5 RF detector and supplied MLP. Publishes five readings directly over MQTT.",
+  "board": "Arduino UNO R4 WiFi",
+  "fqbn": "arduino:renesas_uno:unor4wifi",
+  "visual_profile": "arduino-uno-r4-wifi",
+  "visual_profile": "arduino-uno-r4-wifi",
+  "source": "R4_jamming_detector",
+  "files": [
+    "R4_jamming_detector.ino",
+    "RF_jamming.ino",
+    "src/RfJammingDriver.h",
+    "sketch.yaml",
+    "README.md",
+    "secrets.example.h"
+  ],
+  "libraries": [
+    "AgentwinCore",
+    "AgentwinArduino",
+    "AgentwinUnoR4"
+  ],
+  "config_template": "r4_rf.h.tpl",
+  "defaults": {
+    "device_id": "r4-rf-01",
+    "connector": "mqtt",
+    "baud_rate": 115200,
+    "interval_seconds": 1,
+    "freshness_seconds": 5
+  },
+  "components": [
+    {
+      "component_id": "rf-detector",
+      "component_type": "analog",
+      "label": "RF detector voltage",
+      "pin": "A5",
+      "field_key": "rf_detector_v",
+      "field_type": "number",
+      "unit": "V",
+      "precision": 3
+    },
+    {
+      "component_id": "rf-mean",
+      "component_type": "readonly",
+      "label": "Rolling mean",
+      "pin": "A5",
+      "field_key": "rf_mean_v",
+      "field_type": "number",
+      "unit": "V",
+      "precision": 3
+    },
+    {
+      "component_id": "rf-std",
+      "component_type": "readonly",
+      "label": "Rolling standard deviation",
+      "pin": "A5",
+      "field_key": "rf_std_v",
+      "field_type": "number",
+      "unit": "V",
+      "precision": 3
+    },
+    {
+      "component_id": "jamming-probability",
+      "component_type": "readonly",
+      "label": "Jamming probability",
+      "pin": null,
+      "field_key": "jamming_probability_percent",
+      "field_type": "number",
+      "unit": "%",
+      "precision": 1
+    },
+    {
+      "component_id": "jamming-state",
+      "component_type": "readonly",
+      "label": "Model state",
+      "pin": null,
+      "field_key": "jamming_state",
+      "field_type": "categorical",
+      "unit": "",
+      "precision": 0
+    }
+  ],
+  "notes": [
+    "Keep the existing A5, 10-bit ADC, 3.3 V conversion assumption and model sampling settings.",
+    "Detector voltage and model output require hardware and calibration checks before interpreting them as jamming evidence.",
+    "Fill secrets.h locally with Wi-Fi credentials, the reachable broker LAN address and device credentials. No USB gateway is used."
+  ]
+}

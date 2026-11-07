@@ -44,6 +44,9 @@ def composed_definition(devices, configured_components, freshness_seconds=8):
     return {'schema_version': SCHEMA_VERSION, 'primary_field': next(iter(fields), ''), 'fields': fields, 'components': nodes, 'edges': edges, 'capabilities': capabilities, 'groups': [{'id': 'components', 'name': 'Components'}, {'id': 'devices', 'name': 'Devices'}, {'id': 'transport', 'name': 'Transport'}]}
 
 def starting_components(template, mapping, device_id, freshness_seconds=8):
+    from .hardware_templates import LEGACY, get_template
+    if template not in LEGACY:
+        return [{**item, 'device_id': device_id, 'freshness_seconds': freshness_seconds} for item in get_template(template)['components']]
     presets = {
         'led': [('led', 'led', 'External LED', 'D7', 'led_on', 'boolean', '', 0)],
         'temperature': [('temperature', 'temperature', 'Temperature', None, 'temperature_c', 'number', '°C', 2)],
@@ -55,7 +58,16 @@ def starting_components(template, mapping, device_id, freshness_seconds=8):
 
 def definition(template='generic', mapping=None, inserted=False, cable='Configured connection', device_id='device-01', connector='usb', devices=None, components=None, freshness_seconds=8):
     mapping = mapping or {'field': 'sensor_value', 'unit': 'value'}; device_list = devices or [{'id': device_id, 'connector': connector, 'serial_port': None, 'baud_rate': 115200}]; configured = components or starting_components(template, mapping, device_id, freshness_seconds)
-    return composed_definition(device_list, configured, freshness_seconds)
+    graph = composed_definition(device_list, configured, freshness_seconds)
+    from .hardware_templates import LEGACY, get_template
+    if template not in LEGACY:
+        spec = get_template(template)
+        for node in graph['components']:
+            if node['category'] == 'controller':
+                node['visual']['model'] = spec.get('visual_profile', 'generic')
+                node['configuration'].update(artwork_source='hardware-template', hardware_template=template,
+                                             board_name=spec['board'], fqbn=spec['fqbn'])
+    return graph
 
 def migrate_graph(graph, freshness_seconds=8, template=None, device_id='device-01', connector='usb', mapping=None, devices=None, components=None):
     if graph.get('schema_version') == SCHEMA_VERSION: return graph, False

@@ -4,13 +4,14 @@ from pathlib import Path
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import JSONResponse, FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from .models import ComponentAction, DeviceCreate, ProjectCreate, Question, Scenario, SessionCreate, Settings
 from .store import Store
 from .runtime import Runtime
 from .agent import answer, provider_available, provider_configured
 from .notifications import smtp_configured
+from .hardware_templates import template_catalog, firmware_check, firmware_package
 
 load_dotenv()
 def create_app(path=None, background=True):
@@ -35,6 +36,8 @@ def create_app(path=None, background=True):
         return {'status': 'ready', 'mqtt': runtime.mqtt_connected, 'mqtt_rejections': runtime.rejections, 'agent_configured': configured, 'agent_available': await provider_available() if configured else False, 'agent_provider': os.getenv('LLM_PROVIDER', 'openai'), 'email_configured': smtp_configured(), 'email_default_recipient_configured': bool(os.getenv('AGENTWIN_EMAIL_TO'))}
     @app.get('/api/projects')
     def projects(): return [store.state(project['id']) for project in store.projects()]
+    @app.get('/api/project-templates')
+    def project_templates(): return template_catalog()
     @app.post('/api/projects', status_code=201)
     def create(body: ProjectCreate): return store.create_project(body)
     @app.delete('/api/projects/{pid}', status_code=204)
@@ -49,6 +52,13 @@ def create_app(path=None, background=True):
         components = [item for item in project['graph']['components'] if item.get('configuration', {}).get('device_id') == device_id]
         base = f'agentwin/{pid}/{device_id}'
         return {'project_id': pid, 'device_id': device_id, 'connector': device['connector'], 'serial_port': device.get('serial_port'), 'baud_rate': device.get('baud_rate', 115200), 'topics': {'telemetry': base+'/telemetry', 'command': base+'/command', 'status': base+'/status'}, 'fields': fields, 'components': components, 'freshness_seconds': project['freshness_seconds'], 'session_registration_required': True}
+    @app.get('/api/projects/{pid}/devices/{device_id}/firmware-check')
+    def check_firmware(pid: str, device_id: str, template_id: str):
+        return firmware_check(store.project(pid), device_id, template_id)
+    @app.get('/api/projects/{pid}/devices/{device_id}/firmware.zip')
+    def download_firmware(pid: str, device_id: str, template_id: str):
+        content, filename = firmware_package(store.project(pid), device_id, template_id)
+        return Response(content, media_type='application/zip', headers={'Content-Disposition': f'attachment; filename="{filename}"', 'Cache-Control': 'no-store'})
     @app.get('/api/projects/{pid}')
     def state(pid: str, session: str | None = None): return store.state(pid, session)
     @app.post('/api/projects/{pid}/sessions', status_code=201)
@@ -58,11 +68,15 @@ def create_app(path=None, background=True):
     @app.post('/api/projects/{pid}/sessions/{sid}/actions', status_code=202)
     def action(pid: str, sid: str, body: ComponentAction): return runtime.component_action(pid, sid, body.component_id, body.action, body.value)
     @app.get('/api/projects/{pid}/sessions/{sid}/actions')
-    def actions(pid: str, sid: str): store.session(pid, sid); return store.rows('SELECT * FROM actions WHERE project=? AND session=? ORDER BY created DESC LIMIT 100', (pid, sid))
+    def actions(pid: str, sid: str): return store.actions(pid, sid)
+    @app.post('/api/projects/{pid}/sessions/{sid}/actions/{aid}/confirm', status_code=202)
+    def confirm_action(pid: str, sid: str, aid: str): return runtime.confirm_control_proposal(pid, sid, aid)
+    @app.post('/api/projects/{pid}/sessions/{sid}/actions/{aid}/cancel')
+    def cancel_action(pid: str, sid: str, aid: str): return runtime.cancel_control_proposal(pid, sid, aid)
     @app.post('/api/projects/{pid}/sessions/{sid}/events/{eid}/acknowledge')
     def acknowledge(pid: str, sid: str, eid: str): return store.acknowledge(pid, sid, eid)
     @app.post('/api/projects/{pid}/sessions/{sid}/agent')
-    async def agent(pid: str, sid: str, body: Question): return await answer(store, pid, sid, body.question, component_id=body.component_id)
+    async def agent(pid: str, sid: str, body: Question): return await answer(store, pid, sid, body.question, component_id=body.component_id, control_request=body.control_request.model_dump() if body.control_request else None, control_dispatch=runtime.confirm_control_proposal)
     @app.put('/api/projects/{pid}/settings')
     def settings(pid: str, body: Settings):
         return store.update_settings(pid, body)

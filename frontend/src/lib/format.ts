@@ -16,7 +16,7 @@ export function humanAction(value: string) {
 
 export function metricValue(value: unknown, precision: number) {
   if (value === null || value === undefined) return "Unavailable";
-  if (typeof value === "number") return value.toLocaleString("en-US", { maximumFractionDigits: precision });
+  if (typeof value === "number") return value.toLocaleString("en-US", { maximumFractionDigits: Math.max(precision, Number.isInteger(value) ? 0 : 3) });
   if (typeof value === "boolean") return value ? "On" : "Off";
   return String(value);
 }

@@ -1,4 +1,7 @@
 import { useState } from "react";
+import { metricValue } from "@/lib/format";
+import { ReadingCard } from "@/features/workspace/Readings";
+import { Link } from "react-router-dom";
 import { Activity, Check, ChevronDown, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -8,7 +11,6 @@ import { api, display, time } from "../../types";
 import type { TwinComponentState } from "./model/twin.types";
 
 const age = (value?: number) => value === undefined ? "Unavailable" : value < 1000 ? `${Math.round(value)} ms` : `${(value / 1000).toFixed(1)} s`;
-const metricValue = (value: unknown, precision: number) => value === null || value === undefined ? "Unavailable" : typeof value === "number" ? value.toLocaleString("en-US", { maximumFractionDigits: precision }) : typeof value === "boolean" ? (value ? "ON" : "OFF") : String(value);
 
 function controlReady(state: State, project: Project, field: string) {
   if (state.session.mode !== "live") return false;
@@ -70,6 +72,7 @@ export function TwinInspector({ component, state, refresh, open, onClose }: { co
       {component.observed.receivedAt && <Relation label="Last received">{time(component.observed.receivedAt)}</Relation>}
       <Relation label="Freshness">{component.health.freshness} · {age(component.health.ageMs)}</Relation>
     </Section>
+    <Section title="Reading history">{component.observed.metrics.map(metric => <ReadingCard key={`${state.session.id}:${metric.key}`} state={state} field={metric.key} embedded />)}</Section>
     <Section title="Evidence" defaultOpen className="grid gap-2.5 [&>p]:grid [&>p]:text-xs [&>p]:leading-[1.65] [&>p]:grid-cols-[16px_1fr] [&>p]:gap-2 [&_p>span]:text-muted-foreground [&_p_strong]:mb-0.5 [&_p_strong]:block [&_p_strong]:text-foreground">
       <p className="text-success"><Check className="size-3.5" /><span><strong>Configured</strong>{component.pin ? `${component.label} bound to ${component.pin}.` : `${component.label} exists in project configuration.`}</span></p>
       <p className={component.evidence.level === "reported" ? "text-success" : "text-muted-foreground"}>{component.evidence.level === "reported" ? <Check className="size-3.5" /> : <span aria-hidden="true">—</span>}<span><strong>Reported</strong>{component.evidence.level === "reported" ? `Firmware telemetry received ${age(component.health.ageMs)} ago.` : "No telemetry observed in this session."}</span></p>
@@ -78,7 +81,7 @@ export function TwinInspector({ component, state, refresh, open, onClose }: { co
     {relations.length > 0 && <Section title="Relationships">{relations.map((edge) => <Relation key={edge.id} label={edge.label}>{edge.source === component.id ? state.project.graph.components.find((item) => item.id === edge.target)?.name : state.project.graph.components.find((item) => item.id === edge.source)?.name}</Relation>)}</Section>}
     {Object.keys(component.configured.values).length > 0 && <Section title="Configuration">{Object.entries(component.configured.values).map(([key, value]) => <Relation key={key} label={key.replaceAll("_", " ")}>{display(value)}</Relation>)}</Section>}
     {(component.events.length > 0 || component.source.controls?.length || component.actions.length > 0) && <Section title="Events & actions" defaultOpen>
-      {component.events.filter((event) => !event.recovered).map((event) => <div key={event.id} className="flex gap-2 rounded-lg border border-warning-border bg-warning-subtle p-2.5 text-[11px] text-warning"><Activity className="size-3.5 shrink-0" /><span><strong className="block text-foreground capitalize">{event.kind.replaceAll("_", " ")}</strong>{event.evidence.cause}</span></div>)}
+      {component.events.filter((event) => !event.recovered).map((event) => <div key={event.id} className="flex gap-2 rounded-lg border border-warning-border bg-warning-subtle p-2.5 text-[11px] text-warning"><Activity className="size-3.5 shrink-0" /><span><strong className="block text-foreground capitalize">{event.kind.replaceAll("_", " ")}</strong>{event.evidence.cause}<Link className="mt-2 block underline" to="/events">View operational events</Link></span></div>)}
       {component.source.controls?.map((control) => {
         const ready = controlReady(state, state.project, control.expected.field);
         return <div key={control.action}>

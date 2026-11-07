@@ -19,6 +19,7 @@ class Store:
         CREATE TABLE IF NOT EXISTS events(id TEXT PRIMARY KEY, project TEXT, session TEXT, kind TEXT, created REAL, recovered REAL, acknowledged REAL, evidence TEXT, subject TEXT NOT NULL DEFAULT '', severity TEXT NOT NULL DEFAULT 'warning');
         CREATE TABLE IF NOT EXISTS conversations(id TEXT PRIMARY KEY, project TEXT, session TEXT, created REAL, question TEXT, answer TEXT);
         CREATE TABLE IF NOT EXISTS actions(id TEXT PRIMARY KEY, project TEXT, session TEXT, created REAL, action TEXT, target TEXT, status TEXT);
+        CREATE TABLE IF NOT EXISTS action_proposals(action_id TEXT PRIMARY KEY, details TEXT NOT NULL, expires REAL NOT NULL);
         CREATE TABLE IF NOT EXISTS summaries(id TEXT PRIMARY KEY, project TEXT NOT NULL, session TEXT NOT NULL, slot REAL NOT NULL, period_start REAL NOT NULL, period_end REAL NOT NULL, created REAL NOT NULL, body TEXT NOT NULL, source TEXT NOT NULL, UNIQUE(project,session,slot));
         CREATE TABLE IF NOT EXISTS summary_schedule(project TEXT PRIMARY KEY, next_due REAL NOT NULL);
         CREATE TABLE IF NOT EXISTS email_outbox(id TEXT PRIMARY KEY, project TEXT NOT NULL, ref_kind TEXT NOT NULL, ref_id TEXT NOT NULL, recipient TEXT NOT NULL, subject TEXT NOT NULL, body TEXT NOT NULL, status TEXT NOT NULL, attempts INTEGER NOT NULL DEFAULT 0, next_attempt REAL NOT NULL, sent REAL, last_error TEXT, UNIQUE(ref_kind,ref_id));
@@ -80,11 +81,17 @@ class Store:
 
     def create_project(self, request: ProjectCreate, pid=None):
         pid = pid or f'project-{uid()[:10]}'
-        configured_devices = [{'id': request.device_id, 'connector': request.connector, 'serial_port': request.serial_port, 'baud_rate': 115200}, *[{'id': item.device_id, 'connector': item.connector, 'serial_port': item.serial_port, 'baud_rate': item.baud_rate} for item in request.devices]]
+        configured_devices = [{'id': request.device_id, 'connector': request.connector, 'serial_port': request.serial_port, 'baud_rate': request.baud_rate}, *[{'id': item.device_id, 'connector': item.connector, 'serial_port': item.serial_port, 'baud_rate': item.baud_rate} for item in request.devices]]
         configured_components = [item.model_dump() for item in request.components]
         project = {'id': pid, **request.model_dump(exclude={'devices', 'components'}), 'description': f'{request.template.replace("_", " ").title()} project with independent telemetry, events, controls, and agent context.', 'arabic_title': None, 'created': time.time(), 'agent': {'version': 1, 'mode': 'observe', 'allowed_actions': ['acknowledge_event']}, 'devices': configured_devices, 'components': configured_components}
         project['monitoring']['silence_seconds'] = max(project['monitoring']['silence_seconds'], request.freshness_seconds)
         project['graph'] = definition(request.template, request.mapping.model_dump(), cable=request.cable_description, device_id=request.device_id, connector=request.connector, devices=configured_devices, components=configured_components or None, freshness_seconds=request.freshness_seconds)
+        from .hardware_templates import LEGACY, firmware_check
+        if request.template not in LEGACY:
+            if request.devices: raise ValueError('Hardware templates currently describe one device per project. Use a manual preset for a custom assembly.')
+            check = firmware_check(project, request.device_id, request.template)
+            if not check['compatible']: raise ValueError(' '.join(check['errors']))
+            project['firmware_template_version'] = check['version']
         self.validate_monitoring(project, project['monitoring'])
         self.execute('INSERT INTO projects VALUES (?,?)', (pid, json.dumps(project)))
         self.create_session(pid, 'live'); self.create_session(pid, 'simulated')
@@ -139,6 +146,7 @@ class Store:
         self.project(pid)
         with self.lock:
             self.db.execute('DELETE FROM action_expectations WHERE action_id IN (SELECT id FROM actions WHERE project=?)', (pid,))
+            self.db.execute('DELETE FROM action_proposals WHERE action_id IN (SELECT id FROM actions WHERE project=?)', (pid,))
             self.db.execute('DELETE FROM boots WHERE session IN (SELECT id FROM sessions WHERE project=?)', (pid,))
             for table in ('summaries', 'summary_schedule', 'email_outbox'):
                 self.db.execute(f'DELETE FROM {table} WHERE project=?', (pid,))
@@ -242,6 +250,7 @@ class Store:
                     self.db.execute('UPDATE events SET recovered=? WHERE id=?', (now, old['id']))
                     self._cancel_pending_email('event', old['id'], 'Readings returned to range')
             self.db.execute("UPDATE actions SET status='timed_out' WHERE status='requested' AND id IN (SELECT action_id FROM action_expectations WHERE deadline<?)", (now,))
+            self.db.execute("UPDATE actions SET status='expired' WHERE project=? AND session=? AND status='awaiting_confirmation' AND id IN (SELECT action_id FROM action_proposals WHERE expires<=?)", (pid, sid, now))
             cutoff = now - project.get('retention_days', 30) * 86400
             self.db.execute('DELETE FROM readings WHERE id IN (SELECT id FROM readings WHERE project=? AND received<? ORDER BY id LIMIT 200)', (pid, cutoff))
             self.db.commit()
@@ -348,6 +357,16 @@ class Store:
                     self._queue_email(pid, 'summary', summary_id, recipient, f"Agentwin summary: {project['name']}", email_body, now)
             self.db.commit()
             return summary_id
+    def actions(self, pid, sid):
+        from .control_proposals import proposal_view
+        self.session(pid, sid)
+        rows = self.rows('SELECT a.*, p.details AS proposal_details FROM actions a LEFT JOIN action_proposals p ON p.action_id=a.id WHERE a.project=? AND a.session=? ORDER BY a.created DESC LIMIT 100', (pid, sid))
+        for row in rows:
+            details = row.pop('proposal_details')
+            if details:
+                row['proposal'] = proposal_view(row['id'], row['status'], json.loads(details))
+        return rows
+
     def state(self, pid, sid=None):
         project = self.project(pid); active = self.session(pid, sid, mode='live' if sid is None else None); readings = self.history(pid, active['id']); latest = readings[-1] if readings else None
         live = self.session(pid, mode='live')
@@ -360,7 +379,7 @@ class Store:
         for key, field in project['graph']['fields'].items():
             observed = next((row for row in reversed(readings) if key in row['readings']), None); limit = field.get('freshness_seconds') or project['freshness_seconds']
             field_status[key] = {'received': observed['received'] if observed else None, 'fresh': bool(observed and time.time()-observed['received'] <= limit), 'device_id': field.get('device_id')}
-        return {'project': project, 'session': {**active, 'provenance': json.loads(active['provenance'])}, 'sessions': self.rows('SELECT * FROM sessions WHERE project=? ORDER BY created DESC', (pid,)), 'latest': latest, 'readings': readings, 'events': self.events(pid, active['id']), 'summaries': self.summaries(pid, live['id']), 'next_summary_email_due': next_summary_email_due, 'server_time': time.time(), 'actions': self.rows('SELECT * FROM actions WHERE project=? AND session=? ORDER BY created DESC LIMIT 100', (pid, active['id'])), 'devices': devices, 'field_status': field_status, 'status': 'awaiting data' if not latest else 'stale' if not any(item['fresh'] for item in field_status.values()) else 'reporting', 'gateway_status': 'online' if online else 'unknown', 'agent_config': project['agent']}
+        return {'project': project, 'session': {**active, 'provenance': json.loads(active['provenance'])}, 'sessions': self.rows('SELECT * FROM sessions WHERE project=? ORDER BY created DESC', (pid,)), 'latest': latest, 'readings': readings, 'events': self.events(pid, active['id']), 'summaries': self.summaries(pid, live['id']), 'next_summary_email_due': next_summary_email_due, 'server_time': time.time(), 'actions': self.actions(pid, active['id']), 'devices': devices, 'field_status': field_status, 'status': 'awaiting data' if not latest else 'stale' if not any(item['fresh'] for item in field_status.values()) else 'reporting', 'gateway_status': 'online' if online else 'unknown', 'agent_config': project['agent']}
     def acknowledge(self, pid, sid, eid):
         rows = self.rows('SELECT * FROM events WHERE id=? AND project=? AND session=?', (eid, pid, sid))
         if not rows: raise ValueError('Event not found in this scope')

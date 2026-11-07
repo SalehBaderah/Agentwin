@@ -9,7 +9,7 @@ import time
 import serial
 from dotenv import load_dotenv
 from paho.mqtt import client as mqtt
-from backend.models import Telemetry
+from backend.models import ComponentAction, Telemetry
 
 log = logging.getLogger('agentwin.gateway')
 
@@ -36,9 +36,15 @@ def validate_command(payload, project=None, device=None):
     if len(payload) > 1024:
         raise ValueError('Command too large')
     body = json.loads(payload)
-    if body.get('schema_version') != 1 or body.get('action') != 'set_led' or not isinstance(body.get('value'), bool):
+    if not isinstance(body, dict) or type(body.get('schema_version')) is not int or body['schema_version'] != 1:
         raise ValueError('Unsupported command')
-    if not isinstance(body.get('component_id'), str) or not re.fullmatch(r'[a-z][a-z0-9-]{0,63}', body['component_id']): raise ValueError('Invalid component identity')
+    if set(body) - {'schema_version', 'project_id', 'device_id', 'command_id', 'component_id', 'action', 'value'}:
+        raise ValueError('Unexpected command fields')
+    # Transport validates the envelope; backend metadata and firmware drivers
+    # validate the hardware action. New actions do not need a gateway allowlist.
+    ComponentAction.model_validate({key: body.get(key) for key in ('component_id', 'action', 'value')})
+    if len(json.dumps(body['value'], ensure_ascii=True)) > 256:
+        raise ValueError('Control value too large')
     for key in ('project_id', 'device_id'):
         if key in body and (not isinstance(body[key], str) or not re.fullmatch(r'[a-z0-9-]{1,64}', body[key])): raise ValueError(f'Invalid {key}')
     if project is not None and body.get('project_id') != project: raise ValueError('Command project differs from gateway scope')
@@ -46,7 +52,10 @@ def validate_command(payload, project=None, device=None):
     command_id = body.get('command_id')
     if not isinstance(command_id, str) or not command_id or len(command_id) > 47:
         raise ValueError('Invalid command identity')
-    return json.dumps(body, separators=(',', ':'))
+    command = json.dumps(body, separators=(',', ':'))
+    if len(command.encode('utf-8')) > 768:
+        raise ValueError('Command exceeds the firmware envelope limit')
+    return command
 
 def main():
     load_dotenv()

@@ -111,6 +111,17 @@ export type Session = {
   scenario: string;
   provenance: { origin: string };
 };
+export type ControlProposal = {
+  id: string;
+  status: string;
+  component_id: string;
+  device_id: string;
+  label: string;
+  control_label?: string;
+  action: string;
+  value: boolean | number | string;
+  expires_at: number;
+};
 export type State = {
   project: Project;
   session: Session;
@@ -121,7 +132,7 @@ export type State = {
   summaries: Summary[];
   next_summary_email_due: number | null;
   server_time: number;
-  actions: { id: string; created: number; action: string; target: string; status: string }[];
+  actions: { id: string; created: number; action: string; target: string; status: string; proposal?: ControlProposal }[];
   devices: { id: string; connector: string; online: boolean; reporting: boolean }[];
   field_status: Record<string, { received: number | null; fresh: boolean; device_id?: string | null }>;
   status: string;
@@ -132,6 +143,8 @@ export type Answer = {
   finding: string;
   uncertainty: string;
   next_step: string;
+  source?: string;
+  control_proposal?: ControlProposal;
   evidence: {
     id: string;
     timestamp: number;

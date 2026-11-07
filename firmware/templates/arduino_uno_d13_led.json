@@ -1,0 +1,46 @@
+{
+  "id": "arduino_uno_d13_led",
+  "version": 1,
+  "name": "Arduino UNO D13 LED",
+  "description": "Classic UNO built-in D13 LED over USB. Includes the existing telemetry-confirmed LED control.",
+  "board": "Arduino UNO R3 / classic UNO",
+  "fqbn": "arduino:avr:uno",
+  "visual_profile": "arduino-uno-r3",
+  "visual_profile": "arduino-uno-r3",
+  "source": "arduino_uno_d13_led",
+  "files": [
+    "arduino_uno_d13_led.ino",
+    "src/LedDriver.h",
+    "sketch.yaml",
+    "README.md"
+  ],
+  "libraries": [
+    "AgentwinCore",
+    "AgentwinArduino",
+    "AgentwinAvr"
+  ],
+  "config_template": "uno_led.h.tpl",
+  "defaults": {
+    "device_id": "uno-d13-01",
+    "connector": "usb",
+    "baud_rate": 38400,
+    "interval_seconds": 1,
+    "freshness_seconds": 8
+  },
+  "components": [
+    {
+      "component_id": "led",
+      "component_type": "led",
+      "label": "Built-in LED",
+      "pin": "D13",
+      "field_key": "led_on",
+      "field_type": "boolean",
+      "unit": "",
+      "precision": 0
+    }
+  ],
+  "notes": [
+    "The reported LED output is not independent proof of emitted light.",
+    "Close Serial Monitor before uploading or starting the USB gateway."
+  ]
+}

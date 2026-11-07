@@ -7,6 +7,8 @@ import time
 from typing import Any
 from openai import AsyncOpenAI
 from .store import uid
+from .control_proposals import control_answer, non_immediate_request, opaque_operator_input
+from .control_intent import interpret_control
 
 logger = logging.getLogger(__name__)
 
@@ -254,8 +256,8 @@ def run_tool(store, pid, sid, name, args):
     if name == 'get_event_evidence':
         return [e for e in store.events(pid, sid) if not target or e['id'] == target]
     if name == 'get_allowed_actions':
-        controls = [{'component_id': c['id'], 'action': item['action'], 'label': item['label']} for c in store.project(pid)['graph']['components'] for item in c.get('controls', [])]
-        return {'actions': ['acknowledge_event'], 'controls': controls, 'confirmation': 'operator click required', 'physical_control': bool(controls)}
+        controls = [{'component_id': c['id'], 'action': item['action'], 'label': item['label'], 'parameters': item['parameters'], 'expected': item['expected']} for c in store.project(pid)['graph']['components'] for item in c.get('controls', []) if f"action:{item['action']}" in c['capabilities']]
+        return {'actions': ['acknowledge_event'], 'controls': controls, 'confirmation': 'explicit operator command sends immediately; drafts require confirmation', 'physical_control': bool(controls)}
     if name == 'propose_action':
         if not any(e['id'] == target for e in store.events(pid, sid)):
             raise ValueError('Event outside project/session or unsupported action')
@@ -360,13 +362,46 @@ async def answer_openai(store, pid, sid, question, client=None, component=None):
                 messages.append({'type': 'function_call_output', 'call_id': call.call_id, 'output': json.dumps(output)})
         raise ValueError('Tool-loop budget exceeded')
 
-async def answer(store, pid, sid, question, client=None, component_id=None):
+async def answer(store, pid, sid, question, client=None, component_id=None, control_request=None, control_dispatch=None):
     store.session(pid, sid)
     component = None
     if component_id:
         component = next((c for c in store.project(pid)['graph']['components'] if c['id'] == component_id), None)
         if not component:
             raise ValueError('Component not found in this project')
+    event_proposal = 'propose_action' in required_operations(question, component_id)[0]
+    can_interpret = control_dispatch is not None and (client is not None or provider_configured()) and control_request is None and not event_proposal
+    control_response = control_answer(store, pid, sid, question, component_id, control_request, dispatch=control_dispatch, fallback_unmatched=can_interpret)
+    if control_response is None and control_request is None and control_dispatch is not None and opaque_operator_input(question):
+        control_response = {'available': True, 'source': 'controller', 'evidence': [], 'evidence_ids': [],
+            'finding': 'No command was sent. An identifier or number alone is not a device instruction.',
+            'uncertainty': 'No component and desired operation were specified.',
+            'next_step': 'Tell Win what to do, for example: turn the LED off. To inspect an ID, ask about it explicitly.'}
+    if control_response is None and can_interpret:
+        try:
+            interpreted_project = store.project(pid)
+            intent, interpreted = await interpret_control(interpreted_project, question, component_id, client)
+            if interpreted is not None:
+                current_project = store.project(pid)
+                if non_immediate_request(question):
+                    raise ValueError('This message is not an immediate operator command')
+                if current_project['graph'] != interpreted_project['graph'] or current_project['devices'] != interpreted_project['devices']:
+                    raise ValueError('Hardware configuration changed while interpreting the request')
+                control_response = control_answer(store, pid, sid, question, component_id, interpreted, dispatch=control_dispatch, draft=intent == 'draft')
+            elif intent in ('clarify', 'unsupported'):
+                control_response = {'available': True, 'source': 'controller', 'evidence': [], 'evidence_ids': [],
+                    'finding': 'No command was sent. This project has no configured control for that action.' if intent == 'unsupported' else 'No command was sent. Which component, action and value do you want?',
+                    'uncertainty': 'Only this project’s declared hardware capabilities are available.',
+                    'next_step': 'Choose one of the available physical controls or clarify your request.'}
+        except Exception:
+            logger.exception('Control language interpretation failed for project=%s session=%s', pid, sid)
+            control_response = {'available': False, 'source': 'controller', 'evidence': [], 'evidence_ids': [],
+                'finding': 'Win could not interpret this request. No command was sent.',
+                'uncertainty': 'The language provider is unavailable or returned an invalid control request.',
+                'next_step': 'Try again when the model is available, or use the configured physical controls.'}
+    if control_response is not None:
+        store.execute('INSERT INTO conversations VALUES (?,?,?,?,?,?)', (uid(), pid, sid, time.time(), question, json.dumps(control_response)))
+        return control_response
     if client is None and not provider_configured():
         return {'available': False, 'finding': 'AI agent unavailable', 'uncertainty': 'No configured provider credentials. Monitoring and deterministic events remain available.', 'next_step': 'Review event evidence or configure the server-side API key.', 'evidence': []}
     provider = os.getenv('LLM_PROVIDER', 'openai').lower()

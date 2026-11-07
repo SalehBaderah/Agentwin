@@ -24,7 +24,7 @@ export function ControlsPanel({ state, refresh }: { state: State; refresh: () =>
       {controls.length ? controls.map(({ component, control }) => {
         const latestAction = state.actions.find((action) => action.target === component.id);
         const ready = controlReady(state, state.project, control);
-        const pending = latestAction?.status === "requested";
+        const pending = state.actions.some(action => action.target === component.id && action.status === "requested");
         return (
           <Card key={`${component.id}-${control.action}`} className="control-card gap-0 rounded-[14px] p-5">
             <div className="flex items-start justify-between gap-3">
