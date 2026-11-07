@@ -19,16 +19,16 @@ def store(tmp_path):
     value.db.close()
 
 
-@pytest.mark.parametrize('tid,connector,baud,field_count', [
-    ('arduino_uno_d13_led', 'usb', 38400, 2), ('r4_rf_jamming_detector', 'mqtt', 115200, 5),
+@pytest.mark.parametrize('tid,connector,baud,field_count,version', [
+    ('arduino_uno_d13_led', 'usb', 38400, 2, 1), ('r4_rf_jamming_detector', 'mqtt', 115200, 5, 2),
 ])
-def test_hardware_defaults_are_complete_and_persisted(store, tid, connector, baud, field_count):
+def test_hardware_defaults_are_complete_and_persisted(store, tid, connector, baud, field_count, version):
     project = store.create_project(ProjectCreate(name='Hardware', template=tid, device_id='custom-board'))
     assert project['devices'][0]['baud_rate'] == baud
     assert project['connector'] == connector
     assert len(project['graph']['fields']) == field_count
     assert all(field['device_id'] == 'custom-board' for field in project['graph']['fields'].values())
-    assert store.project(project['id'])['firmware_template_version'] == 1
+    assert store.project(project['id'])['firmware_template_version'] == version
     assert templates.firmware_check(project, 'custom-board', tid)['compatible']
     assert store.state(project['id'])['latest'] is None
     controller = next(node for node in project['graph']['components'] if node['category'] == 'controller')

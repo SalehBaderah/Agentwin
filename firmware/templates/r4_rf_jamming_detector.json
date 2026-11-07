@@ -1,6 +1,6 @@
 {
   "id": "r4_rf_jamming_detector",
-  "version": 1,
+  "version": 2,
   "name": "R4 RF Jamming Detector",
   "description": "UNO R4 WiFi with the existing A5 RF detector and supplied MLP. Publishes five readings directly over MQTT.",
   "board": "Arduino UNO R4 WiFi",

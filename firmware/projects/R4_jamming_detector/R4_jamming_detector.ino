@@ -26,6 +26,7 @@ AgentwinCore agentwin(ProjectConfig::PROJECT_ID, ProjectConfig::DEVICE_ID,
                       transport, drivers, 1);
 
 void setup() {
+  Serial.begin(115200);  // Optional USB diagnostics; never wait for a host.
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, HIGH);  // Shows that battery power reached setup().
   char bootId[48];
@@ -42,4 +43,17 @@ void loop() {
   const unsigned long blinkPeriodMs = network.connected() ? 500 : 150;
   digitalWrite(LED_BUILTIN, transport.connected() ? HIGH :
                ((millis() / blinkPeriodMs) % 2 == 0 ? HIGH : LOW));
+  static unsigned long lastDiagnosticMs = 0;
+  const unsigned long now = millis();
+  if (Serial && now - lastDiagnosticMs >= 5000) {
+    lastDiagnosticMs = now;
+    Serial.print("[AgentWin] wifi="); Serial.print(network.connected() ? "up" : "down");
+    Serial.print(" mqtt="); Serial.print(transport.connected() ? "up" : "down");
+    Serial.print(" sent="); Serial.print(transport.publishedPackets());
+    Serial.print(" failed="); Serial.print(transport.failedPackets());
+    Serial.print(" publish_ms="); Serial.print(transport.lastPublishDurationMs());
+    Serial.print(" last_sent_age_ms=");
+    if (transport.publishedPackets()) Serial.println(now - transport.lastPublishMs());
+    else Serial.println("never");
+  }
 }

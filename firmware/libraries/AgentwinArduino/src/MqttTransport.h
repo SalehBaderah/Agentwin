@@ -42,20 +42,42 @@ class MqttTransport : public AgentwinTransport {
     return true;
   }
   bool publishTelemetry(JsonDocument &packet) override {
-    if (!mqtt_.connected()) return false;
+    const unsigned long started = millis();
+    if (!mqtt_.connected()) return finishPublish(false, started);
     // ArduinoMqttClient buffers unsized messages in a 256-byte TX buffer.
-    // Supplying the exact length streams the JSON instead of truncating it.
+    // Stream an explicitly sized packet, but serialize locally first: writing
+    // JSON directly to WiFiS3 can issue a separate Wi-Fi transaction per byte.
+    char payload[MAX_TELEMETRY_BYTES];
     const size_t payloadSize = measureJson(packet);
-    if (mqtt_.beginMessage(telemetryTopic_, static_cast<unsigned long>(payloadSize)) != 1)
-      return false;
-    const size_t written = serializeJson(packet, mqtt_);
+    if (payloadSize >= sizeof(payload) || serializeJson(packet, payload, sizeof(payload)) != payloadSize)
+      return finishPublish(false, started);
+    if (mqtt_.beginMessage(telemetryTopic_, static_cast<unsigned long>(payloadSize)) != 1) {
+      mqtt_.stop();
+      return finishPublish(false, started);
+    }
+    const size_t written = mqtt_.write(reinterpret_cast<const uint8_t *>(payload), payloadSize);
     const bool published = mqtt_.endMessage() == 1;
     if (written != payloadSize || !published) mqtt_.stop();
-    return written == payloadSize && published;
+    return finishPublish(written == payloadSize && published, started);
   }
+  unsigned long publishedPackets() const { return publishedPackets_; }
+  unsigned long failedPackets() const { return failedPackets_; }
+  unsigned long lastPublishMs() const { return lastPublishMs_; }
+  unsigned long lastPublishDurationMs() const { return lastPublishDurationMs_; }
 
  private:
   static constexpr size_t MAX_COMMAND_BYTES = 768;
+  static constexpr size_t MAX_TELEMETRY_BYTES = 768;
+  bool finishPublish(bool published, unsigned long started) {
+    lastPublishDurationMs_ = millis() - started;
+    if (published) {
+      ++publishedPackets_;
+      lastPublishMs_ = millis();
+    } else {
+      ++failedPackets_;
+    }
+    return published;
+  }
   static MqttTransport *&active() { static MqttTransport *instance = nullptr; return instance; }
   static void onMessage(int messageSize) {
     MqttTransport *self = active();
@@ -82,6 +104,10 @@ class MqttTransport : public AgentwinTransport {
   const char *password_;
   unsigned long reconnectIntervalMs_;
   unsigned long lastReconnectMs_ = 0;
+  unsigned long publishedPackets_ = 0;
+  unsigned long failedPackets_ = 0;
+  unsigned long lastPublishMs_ = 0;
+  unsigned long lastPublishDurationMs_ = 0;
   bool networkAvailable_ = false;
   bool hasPending_ = false;
   String pending_;

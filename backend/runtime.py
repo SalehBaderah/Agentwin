@@ -37,7 +37,9 @@ class Runtime:
                 if kind == 'status': self.store.execute('INSERT OR REPLACE INTO gateways VALUES (?,?,?,?)', (pid, device, time.time(), int(body.get('online') is True))); return
                 if body.get('project_id') != pid or body.get('device_id') != device: raise ValueError('topic mismatch')
                 result = self.store.ingest(body, self.store.session(pid, mode='live')['id'], retained=False)
-                if not result['accepted']: self.rejections += 1
+                if not result['accepted']:
+                    self.rejections += 1
+                    log.warning('Rejected MQTT telemetry project=%s device=%s reason=%s', pid, device, result['reason'])
             except Exception:
                 self.rejections += 1; log.warning('Rejected MQTT message on scoped ingestion boundary')
         self.client.on_connect, self.client.on_disconnect, self.client.on_message = connected, disconnected, message
