@@ -60,7 +60,7 @@ with the people who own them:
 | --- | --- |
 | `IDRAK_Project_Brief.md`, `IDRAK_Team_Overview_EN.md` | Team plans, authorship/consent, and whether historical product proposals belong in the release. |
 | `output/mvp-screenshots/`, `output/pdf/` | Visible project/device/network details, personal information, and image/PDF metadata. |
-| `firmware/projects/R4_jamming_detector/RF_jamming.ino` | Permission and attribution for the supplied model weights and original inference code. |
+| `firmware/projects/R4_jamming_detector/RF_jamming.ino` | The deployed model is also open source in [CryptoPulse AI System](https://github.com/SalehBaderah/cryptopulse-ai-system). Preserve the upstream license and attribution for its weights and inference code. |
 | `frontend/public/assets/`, `backend/assets/` | Ownership and redistribution rights for branding and artwork. |
 | Dependencies and bundled fonts | Upstream licenses and required notices; include notices for copied third-party source/assets. |
 

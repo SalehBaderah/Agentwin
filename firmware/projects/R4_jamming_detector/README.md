@@ -2,6 +2,11 @@
 
 Direct-MQTT Agentwin project integrating the supplied bare-metal MLP weights and inference function. The original model is in `RF_jamming.ino`; Agentwin lifecycle and telemetry are in `R4_jamming_detector.ino` and `src/RfJammingDriver.h`.
 
+The model deployed on this R4 RF Jamming Detector is also open source in
+[CryptoPulse AI System](https://github.com/SalehBaderah/cryptopulse-ai-system).
+AgentWin was originally built to stream real-time edge-device data for CryptoPulse
+and later expanded into a broader IoT monitoring workspace.
+
 The UNO R4 WiFi header exposes A0-A5, so this project uses A5. Do not wire to `A10`. The AD8313 is a logarithmic RF detector/controller covering 0.1-2.5 GHz, not a spectrum analyzer. Its DC output, this specific breakout's supply/pinout, attenuation, antenna response, ADC reference, and model training setup must be verified before interpreting the prediction as calibrated evidence of jamming.
 
 The built-in D13 LED is a connection indicator: solid means MQTT is connected, slow blinking means Wi-Fi is connected but MQTT is not, and fast blinking means Wi-Fi is unavailable. It lights during `setup()` before the Wi-Fi attempt. If it never lights on battery, check the power source and wiring before investigating network settings. This is separate from the classic UNO D13 LED project.
