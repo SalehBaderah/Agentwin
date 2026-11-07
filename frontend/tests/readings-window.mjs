@@ -11,6 +11,7 @@ const errors = [];
 page.on("pageerror", error => errors.push(error.message));
 const snapshots = new Map();
 const sockets = new Set();
+let clearRequests = 0;
 const numeric = page.getByRole("article", { name: "Temperature reading", exact: true });
 const indicator = page.getByRole("article", { name: "Indicator reading", exact: true });
 const mode = page.getByRole("article", { name: "Mode reading", exact: true });
@@ -61,6 +62,15 @@ try {
   await page.route("**/api/projects**", route => {
     const url = new URL(route.request().url());
     const id = url.pathname.split("/")[3];
+    if (url.pathname.endsWith('/readings/clear-history')) {
+      assert.equal(route.request().method(), 'POST');
+      clearRequests += 1;
+      const state = snapshots.get(id);
+      const latest = [...new Map(state.readings.map(reading => [reading.device, reading])).values()];
+      const deleted = state.readings.length - latest.length;
+      publish({ ...state, readings: latest });
+      return route.fulfill({ json: { deleted, kept: latest.length } });
+    }
     return route.fulfill({ json: id ? snapshots.get(id) : [...snapshots.values()] });
   });
   await page.routeWebSocket("**/api/ws**", socket => {
@@ -95,6 +105,22 @@ try {
   await expect(minimum).toHaveText("2 °C");
   await expect(mode.locator("footer")).toContainText("180 observations");
 
+  await page.getByRole('button', { name: 'Clear history', exact: true }).click();
+  await expect(page.getByRole('alertdialog')).toContainText('Reading window fixture 180');
+  assert.equal(clearRequests, 0, 'Opening a confirmation must not clear data');
+  await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+  await expect(numeric.locator('footer')).toContainText('180 observations');
+  assert.equal(clearRequests, 0);
+  await page.getByRole('button', { name: 'Clear history', exact: true }).click();
+  await page.getByRole('button', { name: 'Clear older readings', exact: true }).click();
+  await expect(numeric.locator('footer')).toContainText('1 observation');
+  await expect(page.getByRole('button', { name: 'Clear history', exact: true })).toBeDisabled();
+  await expect(numeric.locator('.recharts-line-dot')).toHaveCount(1);
+  assert.equal(clearRequests, 1);
+  publish(withReadings(snapshots.get(firstId), 2, 182));
+  await expect(numeric.locator('footer')).toContainText('2 observations');
+  await expect(page.getByRole('button', { name: 'Clear history', exact: true })).toBeEnabled();
+
   await page.setViewportSize({ width: 390, height: 844 });
   await expect(page.getByLabel("Window", { exact: true })).toBeVisible();
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), "Reading controls overflow on mobile");
@@ -109,7 +135,7 @@ try {
     const stored = await (await page.request.get(`${base}/api/projects/${id}`)).json();
     assert.equal(stored.latest, null, "Synthetic browser fixtures must never populate Live storage");
   }
-  console.log("Reading windows passed: 30/60/all, metrics and statistics, boolean history, live updates, project isolation, empty data, and mobile layout.");
+  console.log("Reading windows passed: 30/60/all, line charts, gaps, live updates, confirmed history clearing, project isolation, empty data, and mobile layout.");
 } finally {
   for (const id of snapshots.keys()) await page.request.delete(`${base}/api/projects/${id}`);
   await page.unrouteAll({ behavior: "ignoreErrors" });

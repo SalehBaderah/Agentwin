@@ -169,6 +169,23 @@ class Store:
         self.session(pid, sid); rows = self.rows('SELECT * FROM readings WHERE project=? AND session=? ORDER BY id DESC LIMIT ?', (pid, sid, min(max(limit, 1), 180)))
         return [{**row, 'readings': json.loads(row.pop('payload')), 'original': json.loads(row['original']) if row['original'] else None} for row in reversed(rows)]
 
+    def clear_telemetry_history(self, pid, sid):
+        """Remove older samples without resetting freshness or replay protection."""
+        with self.lock:
+            self.project(pid)
+            self.session(pid, sid)
+            # Ingestion checks sequence/uptime against the last stored sample.
+            # Retain it for every device, along with all boot/session records.
+            result = self.db.execute('''
+                DELETE FROM readings WHERE project=? AND session=? AND id NOT IN (
+                    SELECT MAX(id) FROM readings WHERE project=? AND session=? GROUP BY device
+                )''', (pid, sid, pid, sid))
+            kept = self.db.execute(
+                'SELECT COUNT(*) FROM readings WHERE project=? AND session=?', (pid, sid)
+            ).fetchone()[0]
+            self.db.commit()
+            return {'deleted': result.rowcount, 'kept': kept}
+
     def ingest(self, message, sid, retained=False, now=None, original=None):
         telemetry = Telemetry.model_validate(message); project = self.project(telemetry.project_id); session = self.session(telemetry.project_id, sid)
         if telemetry.device_id not in {device['id'] for device in project['devices']}: raise ValueError('Unregistered device/project mapping')

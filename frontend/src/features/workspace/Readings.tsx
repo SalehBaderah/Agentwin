@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { Activity } from "lucide-react";
+import { Activity, Trash2 } from "lucide-react";
 import { Bar, CartesianGrid, ComposedChart, Line, XAxis, YAxis } from "recharts";
 import { Button } from "@/components/ui/button";
+import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { EmptyState } from "@/components/EmptyState";
 import { FormField } from "@/components/FormField";
@@ -9,7 +10,7 @@ import { OptionSelect } from "@/components/OptionSelect";
 import { StatusBadge } from "@/components/StatusBadge";
 import { metricValue, sessionLabel } from "@/lib/format";
 import type { State } from "@/types";
-import { time } from "@/types";
+import { api, time } from "@/types";
 import { readingModel } from "./readingModel";
 import { StateTimeline } from "./StateTimeline";
 import { CategoricalSummary } from "./CategoricalSummary";
@@ -60,25 +61,59 @@ function MetricReadingCard({ state, field, embedded, categoricalView, sampleWind
     {numbers.length > 0 && kind === "continuous" && <dl className="mt-5 grid grid-cols-3 gap-3 border-t pt-4 text-xs">{[["Min", Math.min(...numbers)], ["Sample average", numbers.reduce((sum, n) => sum + n, 0) / numbers.length], ["Max", Math.max(...numbers)]].map(([label, value]) => <div key={label}><dt className="text-muted-foreground">{label}</dt><dd className="mt-1 font-semibold tabular-nums">{format(value)} {metric.unit}</dd></div>)}</dl>}
     {range && kind !== "state" && <p className="mt-3 text-xs text-muted-foreground">Range {range[0]}–{range[1]} {metric.unit}</p>}
     {(kind === "state" || kind === "category") && transitions.length > 0 && <div className="mt-5 border-t pt-4"><h5 className="mb-2 text-xs font-medium text-muted-foreground">Recent changes</h5><div className="divide-y">{transitions.slice(0, limit).map(reading => <div key={reading.id} className="flex justify-between gap-4 py-2 text-xs"><span className="text-muted-foreground">{time(reading.received)}</span><strong className="break-all text-right font-medium">{format(reading.readings[field])}</strong></div>)}</div>{transitions.length > 5 && <Button variant="ghost" size="sm" onClick={() => setLimit(limit >= transitions.length ? 5 : limit + 10)}>{limit >= transitions.length ? "Show less" : "Show more"}</Button>}</div>}
-    <footer className="mt-4 flex flex-wrap justify-between gap-2 text-[11px] text-muted-foreground"><span>{sessionLabel(state.session.mode)} session</span><span>{model.count} observations · {model.gaps} {model.gaps === 1 ? "gap" : "gaps"}</span></footer>
+    <footer className="mt-4 flex flex-wrap justify-between gap-2 text-[11px] text-muted-foreground"><span>{sessionLabel(state.session.mode)} session</span><span>{model.count} {model.count === 1 ? "observation" : "observations"} · {model.gaps} {model.gaps === 1 ? "gap" : "gaps"}</span></footer>
   </article>;
 }
 
-export function Readings({ state }: { state: State }) {
+export function Readings({ state, refresh }: { state: State; refresh: () => void }) {
   const [field, setField] = useState("all");
   const [windowSize, setWindowSize] = useState("30");
+  const [clearOpen, setClearOpen] = useState(false);
+  const [clearing, setClearing] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
   const fields = Object.entries(state.project.graph.fields);
   const available = state.readings.length;
   const shown = windowSize === "all" ? available : Math.min(available, Number(windowSize));
+  const hasOlderReadings = available > new Set(state.readings.map(reading => reading.device)).size;
+  const clearHistory = async () => {
+    setClearing(true); setMessage(""); setError("");
+    try {
+      const result = await api<{ deleted: number; kept: number }>(`/projects/${state.project.id}/sessions/${state.session.id}/readings/clear-history`, {});
+      setMessage(`Cleared ${result.deleted} older reading${result.deleted === 1 ? "" : "s"}. Kept the latest reading for ${result.kept} device${result.kept === 1 ? "" : "s"}.`);
+      setClearOpen(false);
+      refresh();
+    } catch (failure) {
+      setError((failure as Error).message);
+    } finally {
+      setClearing(false);
+    }
+  };
   return <div className="grid gap-5">
     <div className="flex flex-wrap items-end justify-between gap-4">
       <div><h3 className="text-base font-semibold">Live readings</h3><p className="mt-1 text-[13px] text-muted-foreground">Stored observations from the selected session. Missing samples remain gaps.</p></div>
-      <div className="grid w-full gap-3 sm:flex sm:w-auto sm:flex-wrap">
+      <div className="grid w-full gap-3 sm:flex sm:w-auto sm:flex-wrap sm:items-end">
         <FormField id="readings-metric" label="Metric"><OptionSelect id="readings-metric" value={field} onValueChange={setField} className="sm:w-56" options={[{ value: "all", label: "All metrics" }, ...fields.map(([key, item]) => ({ value: key, label: `${item.label} ${item.unit}` }))]} /></FormField>
         <FormField id="readings-window" label="Window"><OptionSelect id="readings-window" value={windowSize} onValueChange={setWindowSize} disabled={available === 0} className="sm:w-40" options={[{ value: "30", label: "Latest 30" }, { value: "60", label: "Latest 60" }, { value: "all", label: "All available" }]} /></FormField>
+        <AlertDialog open={clearOpen} onOpenChange={open => { if (!clearing) { setClearOpen(open); setError(""); } }}>
+          <AlertDialogTrigger asChild><Button variant="outline" disabled={!hasOlderReadings}><Trash2 />Clear history</Button></AlertDialogTrigger>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Clear old telemetry?</AlertDialogTitle>
+              <AlertDialogDescription>Delete older readings across all metrics in {state.project.name}'s {sessionLabel(state.session.mode)} session? The latest reading for each device is kept. Settings, other sessions, and historical event/action records are retained.</AlertDialogDescription>
+            </AlertDialogHeader>
+            <p className="text-sm text-muted-foreground">Deleted readings cannot be recovered.</p>
+            {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={clearing}>Cancel</AlertDialogCancel>
+              <Button variant="destructive" disabled={clearing} onClick={clearHistory}>{clearing ? "Clearing…" : "Clear older readings"}</Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
     <p className="text-xs text-muted-foreground" role="status">Showing {shown} of {available} recent readings. Up to 180 are available in this view.</p>
+    {message && <p role="status" className="text-sm text-muted-foreground">{message}</p>}
     <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,340px),1fr))] items-start gap-4">{fields.filter(([key]) => field === "all" || field === key).map(([key]) => <ReadingCard key={`${state.session.id}:${key}:${windowSize}`} state={state} field={key} windowSize={windowSize} />)}</div>
   </div>;
 }

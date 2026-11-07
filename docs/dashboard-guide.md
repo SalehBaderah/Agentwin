@@ -17,6 +17,12 @@ Agentwin brings multiple IoT systems into one interface. Each project describes 
 
 **Telemetry** means readings sent by firmware. **Freshness** is the allowed time without a new reading: an 8-second threshold means older data is stale. A stored value does not prove the device is still in that state. Live and test sessions are displayed separately.
 
+In **Live readings**, **Clear history** asks for confirmation before deleting older
+telemetry across all metrics in the selected session. The latest reading for each
+device is kept, along with settings, events, actions, and other sessions. New
+readings continue to arrive. Clearing history does not make stale telemetry fresh
+or reset device sequencing.
+
 ## How the current digital twin works
 
 1. Project configuration creates controller, transport, sensor, and actuator nodes, plus their relationships.

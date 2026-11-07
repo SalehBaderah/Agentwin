@@ -166,6 +166,10 @@ def create_app(path=None, background=True):
         await runtime.scenario(pid, sid, body.scenario)
         return {'scenario': body.scenario}
 
+    @app.post('/api/projects/{pid}/sessions/{sid}/readings/clear-history')
+    def clear_telemetry_history(pid: str, sid: str):
+        return store.clear_telemetry_history(pid, sid)
+
     @app.post('/api/projects/{pid}/sessions/{sid}/actions', status_code=202)
     def action(pid: str, sid: str, body: ComponentAction):
         return runtime.component_action(pid, sid, body.component_id, body.action, body.value)

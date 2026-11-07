@@ -179,7 +179,7 @@ export function Workspace({ connected, onContextChange }: { connected: boolean; 
           <Tabs value={tab} onValueChange={setTab} className="gap-0">
             <ScrollArea className="w-full border-b bg-[var(--background-secondary)]"><SlidingTabsList value={tab} items={tabs} aria-label="Project views" className="bg-transparent" /><ScrollBar orientation="horizontal" /></ScrollArea>
             <TabsContent value="overview" className={panelClass("overview")}><ProjectOverview state={state} /></TabsContent>
-            <TabsContent value="readings" className={panelClass("readings")}><Readings state={state} /></TabsContent>
+            <TabsContent value="readings" className={panelClass("readings")}><Readings key={`${state.project.id}:${state.session.id}`} state={state} refresh={refresh} /></TabsContent>
             <TabsContent value="twin" className={panelClass("twin")}>
               <Suspense fallback={<EmptyState icon={<Activity />} title="Loading Live Twin"><p>Preparing the operational scene.</p></EmptyState>}>
                 <DigitalTwin state={state} selectedId={selectedComponentId} onSelect={setSelectedComponentId} refresh={refresh} />
