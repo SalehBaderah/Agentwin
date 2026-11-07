@@ -33,6 +33,24 @@ test('invalid samples and long reporting gaps are never connected or averaged', 
 test('empty sessions cannot inherit another session value', () => {
   assert.equal(readingModel(fixture({}, []), 'sensor').latest, undefined);
 });
+test('other devices cannot interrupt a field history or contribute its values', () => {
+  const state = fixture({ device_id: 'sensor-a' }, [2, 999, 4]);
+  state.readings = state.readings.map((reading, index) => ({ ...reading, device: index === 1 ? 'sensor-b' : 'sensor-a' }));
+  const model = readingModel(state, 'sensor');
+  assert.deepEqual(model.numbers, [2, 4]);
+  assert.deepEqual(model.rows.map(row => row.value), [2, 4]);
+  assert.equal(model.gaps, 0);
+});
+test('a device restart breaks a line without inventing a zero or a later timestamp', () => {
+  const state = fixture({}, [0.4, 0]);
+  state.readings = state.readings.map((reading, index) => ({ ...reading, boot: 'boot-' + index }));
+  const model = readingModel(state, 'sensor');
+  assert.deepEqual(model.rows.map(row => row.value), [0.4, null, 0]);
+  assert.deepEqual(model.numbers, [0.4, 0]);
+  assert.equal(model.gaps, 1);
+  assert.ok(model.rows[1].received > model.rows[0].received);
+  assert.ok(model.rows[1].received < model.rows[2].received);
+});
 test('categorical distribution counts valid observations without inferring durations', () => {
   const model = readingModel(fixture({ data_type: 'categorical' }, ['normal', null, 'attack', 'normal']), 'sensor');
   assert.equal(model.count, 3);

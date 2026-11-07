@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Activity } from "lucide-react";
-import { Area, Bar, CartesianGrid, ComposedChart, XAxis, YAxis } from "recharts";
+import { Bar, CartesianGrid, ComposedChart, Line, XAxis, YAxis } from "recharts";
 import { Button } from "@/components/ui/button";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { EmptyState } from "@/components/EmptyState";
@@ -34,6 +34,11 @@ function MetricReadingCard({ state, field, embedded, categoricalView, sampleWind
   const precision = Math.max(metric.precision, numbers.some(value => !Number.isInteger(value)) ? 3 : 0);
   const format = (value: unknown) => metricValue(value, precision);
   const color = "var(--chart-2)";
+  const start = rows[0]?.received ?? 0;
+  const end = rows.at(-1)?.received ?? start;
+  const padding = Math.max(state.project.interval_seconds, 1);
+  const timeDomain = start === end ? [start - padding, end + padding] : [start, end];
+  const axisTime = (value: number) => new Date(value * 1000).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
   return <article className={embedded ? "min-w-0" : "min-w-0 rounded-2xl border bg-card p-5 shadow-sm sm:p-6"} aria-label={`${metric.label} reading`}>
     <header className="flex flex-wrap items-start justify-between gap-3">
       <div><h4 className="text-sm font-semibold break-words">{metric.label}</h4><p className="mt-1 text-xs text-muted-foreground">{kind === "state" ? "State history" : kind === "category" ? "Reported state" : kind === "count" ? "Count history" : "Sensor history"}{metric.unit ? ` · ${metric.unit}` : ""}</p></div>
@@ -46,16 +51,16 @@ function MetricReadingCard({ state, field, embedded, categoricalView, sampleWind
     {latest ? (kind === "state" || kind === "category" && categoricalView === "timeline") ? <StateTimeline state={state} field={field} sampleWindow={sampleWindow} /> : kind === "category" ? <CategoricalSummary state={state} field={field} /> : <ChartContainer config={{ value: { label: metric.label, color } }} className="aspect-auto h-56 w-full border-t pt-5">
       <ComposedChart accessibilityLayer data={rows} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
         <CartesianGrid vertical={false} strokeDasharray="3 5" />
-        <XAxis dataKey="received" type="number" domain={["dataMin", "dataMax"]} tickFormatter={value => time(Number(value))} tickLine={false} axisLine={false} minTickGap={65} />
+        <XAxis dataKey="received" type="number" scale="time" domain={timeDomain} tickFormatter={value => axisTime(Number(value))} tickLine={false} axisLine={false} tickMargin={10} minTickGap={32} />
         <YAxis width={48} tickLine={false} axisLine={false} domain={range ?? (kind === "count" ? [0, "auto"] : ["auto", "auto"])} allowDecimals={kind !== "count"} tickFormatter={value => Number(value).toLocaleString("en-US", { maximumSignificantDigits: 3 })} />
         <ChartTooltip content={<ChartTooltipContent labelFormatter={(_, payload) => time(Number(payload?.[0]?.payload?.received))} formatter={value => <><span className="text-muted-foreground">{metric.label}</span><strong className="ml-auto tabular-nums">{format(value)} {metric.unit}</strong></>} />} />
-        {kind === "count" ? <Bar dataKey="value" fill={color} radius={[3, 3, 0, 0]} maxBarSize={24} isAnimationActive={false} /> : <Area dataKey="value" type="linear" stroke={color} fill={color} fillOpacity={0.08} strokeWidth={2} dot={{ r: 2, strokeWidth: 0 }} activeDot={{ r: 4 }} connectNulls={false} isAnimationActive={false} />}
+        {kind === "count" ? <Bar dataKey="value" fill={color} radius={[3, 3, 0, 0]} maxBarSize={24} isAnimationActive={false} /> : <Line dataKey="value" type="linear" stroke={color} strokeWidth={2} dot={{ r: 2, strokeWidth: 0, fill: color }} activeDot={{ r: 4 }} connectNulls={false} isAnimationActive={false} />}
       </ComposedChart>
     </ChartContainer> : <EmptyState className="h-56 justify-center border-0" icon={<Activity />} title="No readings in this session"><p>This field appears when the selected source reports it.</p></EmptyState>}
     {numbers.length > 0 && kind === "continuous" && <dl className="mt-5 grid grid-cols-3 gap-3 border-t pt-4 text-xs">{[["Min", Math.min(...numbers)], ["Sample average", numbers.reduce((sum, n) => sum + n, 0) / numbers.length], ["Max", Math.max(...numbers)]].map(([label, value]) => <div key={label}><dt className="text-muted-foreground">{label}</dt><dd className="mt-1 font-semibold tabular-nums">{format(value)} {metric.unit}</dd></div>)}</dl>}
     {range && kind !== "state" && <p className="mt-3 text-xs text-muted-foreground">Range {range[0]}–{range[1]} {metric.unit}</p>}
     {(kind === "state" || kind === "category") && transitions.length > 0 && <div className="mt-5 border-t pt-4"><h5 className="mb-2 text-xs font-medium text-muted-foreground">Recent changes</h5><div className="divide-y">{transitions.slice(0, limit).map(reading => <div key={reading.id} className="flex justify-between gap-4 py-2 text-xs"><span className="text-muted-foreground">{time(reading.received)}</span><strong className="break-all text-right font-medium">{format(reading.readings[field])}</strong></div>)}</div>{transitions.length > 5 && <Button variant="ghost" size="sm" onClick={() => setLimit(limit >= transitions.length ? 5 : limit + 10)}>{limit >= transitions.length ? "Show less" : "Show more"}</Button>}</div>}
-    <footer className="mt-4 flex flex-wrap justify-between gap-2 text-[11px] text-muted-foreground"><span>{sessionLabel(state.session.mode)} session</span><span>{model.count} observations · gaps stay empty</span></footer>
+    <footer className="mt-4 flex flex-wrap justify-between gap-2 text-[11px] text-muted-foreground"><span>{sessionLabel(state.session.mode)} session</span><span>{model.count} observations · {model.gaps} {model.gaps === 1 ? "gap" : "gaps"}</span></footer>
   </article>;
 }
 

@@ -28,6 +28,12 @@ FastAPI serves `frontend/dist` when that directory exists at startup. After
 `npm --prefix frontend run build`, restart FastAPI if it was started before the
 first build. Frontend hot reload happens through Vite, not through the built UI.
 
+After `git pull`, rebuild the frontend and restart Uvicorn before expecting UI
+changes on port 8000. Pulling source files alone does not replace `frontend/dist`.
+On Windows, run `.\scripts\start.ps1` to build the current frontend and start
+the backend together; the script stops if the build fails. If you start Uvicorn
+directly, run `npm.cmd --prefix frontend run build` first.
+
 ## Control a simulated session from the CLI
 
 Create a project in the UI, then copy its ID from `/projects/<project-id>` in the

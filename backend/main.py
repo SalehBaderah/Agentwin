@@ -226,7 +226,7 @@ def create_app(path=None, background=True):
         def frontend(route: str):
             if route.startswith('api/'):
                 return JSONResponse({'detail': 'Not found'}, status_code=404)
-            return FileResponse(dist / 'index.html')
+            return FileResponse(dist / 'index.html', headers={'Cache-Control': 'no-cache'})
 
     return app
 

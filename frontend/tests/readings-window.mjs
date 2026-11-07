@@ -68,9 +68,12 @@ try {
     socket.onClose(() => sockets.delete(socket));
     send(socket);
   });
-  await page.goto(`${base}/projects/${firstId}?tab=readings`);
+  const document = await page.goto(`${base}/projects/${firstId}?tab=readings`);
+  assert.equal(document.headers()['cache-control'], 'no-cache', 'Revalidate the entry page after rebuilding the frontend');
   await expect(page.getByLabel("Window", { exact: true })).toHaveAttribute("data-value", "30");
   await expect(numeric.locator("footer")).toContainText("30 observations");
+  await expect(numeric.locator('.recharts-line')).toHaveCount(1);
+  await expect(numeric.locator('.recharts-area')).toHaveCount(0);
   await expect(minimum).toHaveText("151 °C");
   await expect(indicator.locator("footer")).toContainText("30 observations");
   await expect(mode.locator("footer")).toContainText("30 observations");

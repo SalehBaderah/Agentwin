@@ -67,6 +67,11 @@ The copy commands preserve an existing `.env`. Defaults disable AI and store dat
 in `data/agentwin.db`; no credentials are needed for simulation. Restart the
 backend after changing `.env`, and keep one worker for SQLite.
 
+**After pulling updates:** rebuild with `npm --prefix frontend run build` (or
+`npm.cmd --prefix frontend run build` on Windows), then restart Uvicorn and
+refresh the browser. Uvicorn serves the compiled frontend; it does not rebuild
+it. On Windows, `scripts/start.ps1` rebuilds the frontend before starting the app.
+
 ### Try it without hardware
 
 1. Select **Add project → Custom configuration**, review the defaults, and create
