@@ -10,9 +10,11 @@ const durationLabel = (seconds: number) =>
 export function StateTimeline({
   state,
   field,
+  sampleWindow = false,
 }: {
   state: State;
   field: string;
+  sampleWindow?: boolean;
 }) {
   const [summary, setSummary] = useState(false);
   const [active, setActive] = useState<number | null>(null);
@@ -28,7 +30,7 @@ export function StateTimeline({
     metric.device_id,
     {
       boolean: binary,
-      windowSeconds: binary && !allHistory ? 300 : undefined,
+      windowSeconds: binary && !sampleWindow && !allHistory ? 300 : undefined,
     },
   );
   const color = (label: string) =>
@@ -93,7 +95,7 @@ export function StateTimeline({
               ? "On / Off history"
               : "State timeline"}
         </h5>
-        {binary && (
+        {binary && !sampleWindow && (
           <select
             aria-label="State history window"
             className="rounded-lg border bg-background px-2.5 py-1.5 text-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"

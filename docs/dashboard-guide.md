@@ -9,7 +9,7 @@ Agentwin brings multiple IoT systems into one interface. Each project describes 
 | Platform overview | Project cards, reporting devices, telemetry history, pending actions, and open events | Find which systems need attention without opening every project. |
 | Project header | Project name and copyable ID, selected session, connection status, freshness, latest reading, and last telemetry time | Identify the system and judge whether its data is current. |
 | Overview tab | Component readings, device status, and recent actions | Check the project's current condition quickly. |
-| Live readings | Numeric charts or state changes with **Show more** | Track trends and changes without listing every repeated boolean sample. |
+| Live readings | Numeric charts or state changes, with a **Window** selector for **Latest 30**, **Latest 60**, or **All available** readings | Apply the same sample window to every metric, chart, and statistic in the selected session. Up to 180 recent readings are available in this view. |
 | Digital twin | Device/component nodes, configured connections, and reported state | Understand where a reading comes from and which component is involved. |
 | Events & history | Event evidence, timestamps, acknowledgement, and recovery status | Investigate interruptions; acknowledging an event does not fix its cause. |
 | Controls | Supported actions, reported state, and command results | Verify a command through matching device telemetry and acknowledgement. |

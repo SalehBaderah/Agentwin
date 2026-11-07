@@ -106,6 +106,7 @@ In a second terminal:
 cd frontend
 npx playwright install chromium
 npm run smoke
+npm run test:windows
 ```
 
 On Linux, Playwright may also require OS libraries; use its documented

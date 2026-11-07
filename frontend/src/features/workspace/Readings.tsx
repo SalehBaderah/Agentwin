@@ -15,13 +15,16 @@ import { StateTimeline } from "./StateTimeline";
 import { CategoricalSummary } from "./CategoricalSummary";
 import { CommandAcknowledgementCard, isCommandAcknowledgement } from "./CommandAcknowledgement";
 
-export function ReadingCard({ state, field, embedded = false, categoricalView = "distribution" }: { state: State; field: string; embedded?: boolean; categoricalView?: "distribution" | "timeline" }) {
+export function ReadingCard({ state, field, embedded = false, categoricalView = "distribution", windowSize }: { state: State; field: string; embedded?: boolean; categoricalView?: "distribution" | "timeline"; windowSize?: string }) {
+  const historyState = windowSize && windowSize !== "all"
+    ? { ...state, readings: state.readings.slice(-Number(windowSize)) }
+    : state;
   return isCommandAcknowledgement(state, field)
-    ? <CommandAcknowledgementCard state={state} field={field} embedded={embedded} />
-    : <MetricReadingCard state={state} field={field} embedded={embedded} categoricalView={categoricalView} />;
+    ? <CommandAcknowledgementCard state={historyState} field={field} embedded={embedded} />
+    : <MetricReadingCard state={historyState} field={field} embedded={embedded} categoricalView={categoricalView} sampleWindow={windowSize !== undefined} />;
 }
 
-function MetricReadingCard({ state, field, embedded, categoricalView }: { state: State; field: string; embedded: boolean; categoricalView: "distribution" | "timeline" }) {
+function MetricReadingCard({ state, field, embedded, categoricalView, sampleWindow }: { state: State; field: string; embedded: boolean; categoricalView: "distribution" | "timeline"; sampleWindow: boolean }) {
   const [limit, setLimit] = useState(5);
   const metric = state.project.graph.fields[field];
   const model = readingModel(state, field);
@@ -40,7 +43,7 @@ function MetricReadingCard({ state, field, embedded, categoricalView }: { state:
       <div className="min-w-0"><strong className="font-heading text-3xl font-semibold tracking-tight break-words tabular-nums">{format(latest?.readings[field])}</strong>{latest && metric.unit && <span className="ml-2 text-sm text-muted-foreground">{metric.unit}</span>}</div>
       <span className="text-xs text-muted-foreground" title={latest ? new Date(latest.received * 1000).toLocaleString() : undefined}>{latest ? `${fresh ? "Received" : "Last known"} ${time(latest.received)}` : "Awaiting telemetry"}</span>
     </div>
-    {latest ? (kind === "state" || kind === "category" && categoricalView === "timeline") ? <StateTimeline state={state} field={field} /> : kind === "category" ? <CategoricalSummary state={state} field={field} /> : <ChartContainer config={{ value: { label: metric.label, color } }} className="aspect-auto h-56 w-full border-t pt-5">
+    {latest ? (kind === "state" || kind === "category" && categoricalView === "timeline") ? <StateTimeline state={state} field={field} sampleWindow={sampleWindow} /> : kind === "category" ? <CategoricalSummary state={state} field={field} /> : <ChartContainer config={{ value: { label: metric.label, color } }} className="aspect-auto h-56 w-full border-t pt-5">
       <ComposedChart accessibilityLayer data={rows} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
         <CartesianGrid vertical={false} strokeDasharray="3 5" />
         <XAxis dataKey="received" type="number" domain={["dataMin", "dataMax"]} tickFormatter={value => time(Number(value))} tickLine={false} axisLine={false} minTickGap={65} />
@@ -58,9 +61,19 @@ function MetricReadingCard({ state, field, embedded, categoricalView }: { state:
 
 export function Readings({ state }: { state: State }) {
   const [field, setField] = useState("all");
+  const [windowSize, setWindowSize] = useState("30");
   const fields = Object.entries(state.project.graph.fields);
+  const available = state.readings.length;
+  const shown = windowSize === "all" ? available : Math.min(available, Number(windowSize));
   return <div className="grid gap-5">
-    <div className="flex flex-wrap items-end justify-between gap-4"><div><h3 className="text-base font-semibold">Live readings</h3><p className="mt-1 text-[13px] text-muted-foreground">Stored observations from the selected session. Missing samples remain gaps.</p></div><FormField id="readings-metric" label="Metric"><OptionSelect id="readings-metric" value={field} onValueChange={setField} className="sm:w-56" options={[{ value: "all", label: "All metrics" }, ...fields.map(([key, item]) => ({ value: key, label: `${item.label} ${item.unit}` }))]} /></FormField></div>
-    <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,340px),1fr))] items-start gap-4">{fields.filter(([key]) => field === "all" || field === key).map(([key]) => <ReadingCard key={`${state.session.id}:${key}`} state={state} field={key} />)}</div>
+    <div className="flex flex-wrap items-end justify-between gap-4">
+      <div><h3 className="text-base font-semibold">Live readings</h3><p className="mt-1 text-[13px] text-muted-foreground">Stored observations from the selected session. Missing samples remain gaps.</p></div>
+      <div className="grid w-full gap-3 sm:flex sm:w-auto sm:flex-wrap">
+        <FormField id="readings-metric" label="Metric"><OptionSelect id="readings-metric" value={field} onValueChange={setField} className="sm:w-56" options={[{ value: "all", label: "All metrics" }, ...fields.map(([key, item]) => ({ value: key, label: `${item.label} ${item.unit}` }))]} /></FormField>
+        <FormField id="readings-window" label="Window"><OptionSelect id="readings-window" value={windowSize} onValueChange={setWindowSize} disabled={available === 0} className="sm:w-40" options={[{ value: "30", label: "Latest 30" }, { value: "60", label: "Latest 60" }, { value: "all", label: "All available" }]} /></FormField>
+      </div>
+    </div>
+    <p className="text-xs text-muted-foreground" role="status">Showing {shown} of {available} recent readings. Up to 180 are available in this view.</p>
+    <div className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,340px),1fr))] items-start gap-4">{fields.filter(([key]) => field === "all" || field === key).map(([key]) => <ReadingCard key={`${state.session.id}:${key}:${windowSize}`} state={state} field={key} windowSize={windowSize} />)}</div>
   </div>;
 }
